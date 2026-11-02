@@ -57,7 +57,7 @@
 
 ### SYN-003 | 지오코딩 품질 표시
 - 원본 ID: SYN-002
-- 생성 코드 경로 + 커밋: src/validate_geocode.py, 커밋 확인 필요 (검증 커밋에서 기록)
+- 생성 코드 경로 + 커밋: src/validate_geocode.py, 커밋 dd53f87
 - 시드·파라미터: 무작위 표본 seed=42, 표본 크기 500, 카카오 API 호출 1,000건(주소 재조회 500 + 좌표→행정구역 역조회 500)
 - 출력 경로·샘플 수·크기·해시: data/processed/geocode_quality.csv, 34,640행, 2.7M, 해시 확인 필요
 - 검증 결과: exact 500건(표본 전체), unknown 34,140건(표본 밖, 공유좌표 0건이라 region 등급 없음). 표본 exact 비율 100.0%, 법정동 일치율 100.0% → 좌표 사용 가능 판정. results/geocode_validation.md 참조
