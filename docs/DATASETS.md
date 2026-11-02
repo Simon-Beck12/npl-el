@@ -34,7 +34,7 @@
 
 ### SYN-001 | 연립·다세대 정제 거래
 - 원본 ID: DS-01
-- 생성 코드 경로 + 커밋: src/parse_clean.py, 커밋 확인 필요 (feat 커밋에서 추가)
+- 생성 코드 경로 + 커밋: src/parse_clean.py, 커밋 02c56c6
 - 시드·파라미터: 없음 (결정적 파싱·정제)
 - 출력 경로·샘플 수·크기·해시: data/processed/rh_trade_clean.parquet, 69,371행, 3.3M, 해시 확인 필요
 - 검증 결과: 원본 72,953행 → 해제 3,582건 제거 → 결측 0건 제거 → 69,371행. results/collect_summary.md 참조
@@ -45,7 +45,7 @@
 
 ### SYN-002 | 지번 지오코딩 캐시(카카오 로컬)
 - 원본 ID: DS-01, SYN-001
-- 생성 코드 경로 + 커밋: src/geocode.py, 커밋 확인 필요 (feat 커밋에서 추가)
+- 생성 코드 경로 + 커밋: src/geocode.py, 커밋 02c56c6
 - 시드·파라미터: 없음 (결정적 API 호출)
 - 출력 경로·샘플 수·크기·해시: data/processed/geocode_cache.csv, 34,640행, 2.7M, 해시 확인 필요
 - 검증 결과: 매칭률 100.0%(34,640/34,640). results/collect_summary.md 참조
