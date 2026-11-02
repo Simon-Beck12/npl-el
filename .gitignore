@@ -1,0 +1,47 @@
+# 기본: 최상위 전부 제외 (새 폴더는 자동으로 제외된다)
+/*
+# 허용 — 파일
+!/.gitignore
+!/.gitattributes
+!/CLAUDE.md
+!/README.md
+!/pyproject.toml
+!/uv.lock
+!/.python-version
+!/requirements*.txt
+# 허용 — 폴더 (CODE_DIRS에서 생성)
+!/docs/
+!/src/
+!/tests/
+!/notebooks/
+!/configs/
+!/scripts/
+# 허용 폴더 안에서도 제외
+**/__pycache__/
+**/.ipynb_checkpoints/
+**/*_out/
+**/outputs/
+**/data/
+.env
+*.zip
+*.tar
+*.gz
+*.mat
+*.npy
+*.npz
+*.pkl
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.h5
+*.hdf5
+*.parquet
+*.feather
+*.edf
+*.bdf
+*.fif
+*.set
+*.dcm
+*.nii
+*.nii.gz
