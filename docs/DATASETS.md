@@ -43,7 +43,7 @@
 - 제외 항목: 없음 (원본 그대로 보관)
 - 이상: 없음 확인됨 (연속 실패 0건, data/logs/onbid_errors.log 없음)
 - 사용 실험: EXP-003(예정)
-- 생성 코드 경로 + 커밋: src/collect_onbid.py, 커밋 확인 필요
+- 생성 코드 경로 + 커밋: src/collect_onbid.py, 커밋 3dfb0f3
 - 주의: 공매 데이터이며 법원경매와 다르다. data/raw/ 아래 파일은 수정·덮어쓰지 않는다
 
 ## 항목 양식 — 파생 데이터(SYN)
@@ -86,7 +86,7 @@
 
 ### SYN-004 | 온비드 물건 단위 정리
 - 원본 ID: DS-02
-- 생성 코드 경로 + 커밋: src/parse_onbid.py (커밋 확인 필요)
+- 생성 코드 경로 + 커밋: src/parse_onbid.py (커밋 3dfb0f3)
 - 시드·파라미터: 없음 (결정적 파싱·집계). 주소 추출 정규식은 "서울(특별시|시)? 구 동 지번" 패턴만 인식(도로명주소는 parse_fail=1)
 - 출력 경로·샘플 수·크기·해시: data/processed/onbid_rounds_raw.parquet(회차 단위, 16,283행, 504K), data/processed/onbid_items.parquet(물건 단위, 2,228행, 80K), 해시 확인 필요
 - 검증 결과: 회차 16,283건 → cltrMngNo 기준 물건 2,228건으로 집계. 빌라 계열(villa_flag=1) 945건(42.4%), 그중 주소추출실패 82건(8.7%), bad_lowest 224건(23.7%, 멈춤 지점 10% 초과·결론에 기록), bad_ratio·bad_bid 0건, villa_flag=1&parse_fail=0 863건(기준 200건 충족), 빌라 계열 낙찰 107건(기준 100건 충족, 임계값에 근접). results/onbid_summary.md 참조. 검증 스크립트 check_onbid.py(저장소 루트, 사용자 작성)로 동일 수치 재확인
