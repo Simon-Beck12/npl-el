@@ -16,6 +16,7 @@ from deposit_ratio import load_rent_with_key
 from mixture_test import RISK_THRESHOLD, load_learning_target_v3
 
 ROOT = Path(__file__).resolve().parent.parent
+DIAG_JEONSE_CSV = ROOT / "results" / "exp006_diag_jeonse.csv"
 
 
 def build_risk_groups():
@@ -90,6 +91,8 @@ def main():
     a = diag_a_jeonse_only(target, rent)
     print("[진단 a] 전세(월세=0)만 사용한 보증금 비율:")
     print(a)
+    a.to_csv(DIAG_JEONSE_CSV)
+    print(f"저장(EXP-007 0단계, 2026-11-04): {DIAG_JEONSE_CSV}")
 
     b = diag_b_contract_date_dist(target, rent)
     print("[진단 b] 매칭 계약 계약일·개찰일까지 기간 분포(풀링):")
