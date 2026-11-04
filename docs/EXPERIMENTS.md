@@ -24,7 +24,7 @@
 | EXP-002 | 시세 추정 기준선 | 완료 | 채택(B1) | 2026-11-03 18:26 | pooled MdAPE: B0 24.52% / B1 17.04% | b7e4465 |
 | EXP-003 | FAISS k-NN 비교사례 시세 추정 + 온비드 가중 평가 | 완료 | 채택(FAISS k-NN) | 2026-11-03 23:39 | pooled MdAPE: B1 17.04% / FAISS 14.58% | c9c49fd |
 | EXP-004 | FAISS 탐색 범위 확장 (작은 k, 큰 위치 가중치) | 완료 | 채택(EXP-004) | 2026-11-04 01:47 | pooled MdAPE: EXP-003 14.58% / EXP-004 13.35% | 9943aea |
-| EXP-005 | 공매 빌라 낙찰가율·매각 시점 추정 | 완료 | 채택(M2, rho_appr·rho_mkt 둘 다) | 2026-11-04 10:42 | LOO MdAE: rho_appr 7.00%p / rho_mkt 14.92%p | 커밋 확인 필요 |
+| EXP-005 | 공매 빌라 낙찰가율·매각 시점 추정 | 완료 | 채택(M2, rho_appr·rho_mkt 둘 다) | 2026-11-04 10:42 | LOO MdAE: rho_appr 7.00%p / rho_mkt 14.92%p | 9a95914 |
 
 ---
 
