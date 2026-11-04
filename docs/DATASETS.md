@@ -187,7 +187,7 @@
 
 ### SYN-008 | 포트폴리오 20건 + 가상 채권 조건
 - 원본 ID: SYN-005-v3, SYN-006, EXP-005·EXP-006 결과, exp007_rho_loo_v3.parquet(v3 재적합 LOO M2)
-- 생성 코드 경로 + 커밋: src/build_portfolio.py, 커밋(이 실험 종료 커밋, 아래 참조)
+- 생성 코드 경로 + 커밋: src/build_portfolio.py, 커밋 0e79b11
 - 시드·파라미터: seed=42, `np.random.default_rng(42)`를 "극단 2건→나머지 10건→미낙찰 8건" 순서로 소비. 가상 채권 가정값(LTV 70%, 채권최고액 120%, 약정금리 12%, 연체가산 3%p, 집행비용 1%, 할인율 8%)은 EXP-007 [사전 기록할 사용자 결정] 참조
 - 출력 경로·샘플 수·크기·해시: data/processed/portfolio_v1.parquet(20행), data/processed/portfolio_comps_v1.parquet(200행, 비교사례), 해시 확인 필요
 - 검증 결과: 극단 물건 후보 9건(≥2건 충족), 미낙찰 후보 435건(≥8건 충족), 보증금_기본 결측 0/20
