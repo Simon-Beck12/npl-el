@@ -13,6 +13,8 @@
 - ~~시세 모델: FAISS k-NN (fold별 설정) — EXP-003~~ (2026-11-04, EXP-004로 대체)
 - 시세 모델: FAISS k-NN (EXP-004 fold별 설정) — EXP-004
 - 시세 모델 확정: EXP-004 — 사용자 결정 2026-11-04
+- 낙찰가율 모델: M2(회차 구간 + 구 부분 풀링), rho_appr·rho_mkt 둘 다 — EXP-005
+- 매각 시점 분포: Kaplan-Meier(사건=낙찰), 중앙 매각 시점 정의되지 않음(관찰 기간 내 매각 확률 50% 미도달) — EXP-005
 
 ## 대장
 
@@ -22,7 +24,7 @@
 | EXP-002 | 시세 추정 기준선 | 완료 | 채택(B1) | 2026-11-03 18:26 | pooled MdAPE: B0 24.52% / B1 17.04% | b7e4465 |
 | EXP-003 | FAISS k-NN 비교사례 시세 추정 + 온비드 가중 평가 | 완료 | 채택(FAISS k-NN) | 2026-11-03 23:39 | pooled MdAPE: B1 17.04% / FAISS 14.58% | c9c49fd |
 | EXP-004 | FAISS 탐색 범위 확장 (작은 k, 큰 위치 가중치) | 완료 | 채택(EXP-004) | 2026-11-04 01:47 | pooled MdAPE: EXP-003 14.58% / EXP-004 13.35% | 9943aea |
-| EXP-005 | 공매 빌라 낙찰가율·매각 시점 추정 | 계획 | - | - | - | 커밋 확인 필요 |
+| EXP-005 | 공매 빌라 낙찰가율·매각 시점 추정 | 완료 | 채택(M2, rho_appr·rho_mkt 둘 다) | 2026-11-04 10:42 | LOO MdAE: rho_appr 7.00%p / rho_mkt 14.92%p | 커밋 확인 필요 |
 
 ---
 
@@ -249,8 +251,8 @@
 ---
 
 ## EXP-005 | 공매 빌라 낙찰가율·매각 시점 추정
-- 상태: 실행중 | 판정: -
-- 시작: 2026-11-04 10:42 KST | 종료: | 커밋: ac5ffa1
+- 상태: 완료 | 판정: 채택(M2, rho_appr·rho_mkt 둘 다)
+- 시작: 2026-11-04 10:42 KST | 종료: 2026-11-04 10:58 KST | 커밋: ac5ffa1
 - 실행 명령: `uv run python src/onbid_features.py && uv run python src/auction_rate.py && uv run python src/time_to_sale.py` | 출력 폴더: results/, results/figures/, data/processed/(SYN-005·결과, 커밋 안 함)
 - 배경: EXP-004에서 시세 모델을 확정했다. 이 시세 모델을 공매 빌라 물건(SYN-004)에 적용해 감정가 기준·시세 기준 낙찰가율을 각각 추정하고, 매각까지 걸리는 시점 분포(일수·회차)를 구한다.
 - 목적: 공매 빌라 낙찰 결과로 낙찰가율과 매각 시점 분포를 추정한다. 공매 물건에 EXP-004 시세 모델을 적용해 시세 기준 낙찰가율도 계산한다.
@@ -275,11 +277,23 @@
   2. bad_lowest 진단(표1), src/onbid_features.py(SYN-005 생성: 좌표·층·연식·EXP-004 시세, 미래 거래 누수 검사)
   3. 감정가÷추정시세 비교(표2), src/auction_rate.py(M0/M1/M2 LOO MdAE 판정), 민감도(표7)
   4. src/time_to_sale.py(Kaplan-Meier, results/figures/exp005_km.png), results/exp005_auction.md 표1~9
-- 결과: (실행 후 기록)
-- 주의:
-- 판정과 이유: (실행 후 기록)
+- 결과:
+
+  | 지표 | M0 | M1 | M2(채택) |
+  |---|---|---|---|
+  | rho_appr LOO MdAE(%p) | 10.07 | 8.64 | 7.00 |
+  | rho_mkt LOO MdAE(%p) | 22.02 | 18.79 | 14.92 |
+  | rho_appr 중앙값(%, 88건) | - | - | 70.5 |
+  | rho_mkt 중앙값(%, 99건) | - | - | 74.1 |
+  | 90/180/365일 매각 확률 | - | - | 22.2% / 22.8% / 27.7% |
+  | 중앙 매각 일수·회차 | - | - | 정의되지 않음(S(t)가 관찰 기간 내 50% 미도달, 최대 29.8%) |
+
+  - 지표 설명: LOO MdAE(%p, Leave-One-Out 절대오차 중앙값), 분위수(%), Kaplan-Meier 매각 확률(%). 임계값(실행 전 고정): LOO MdAE 최저 후보 채택, 더 단순한 후보와 1.0%p 미만 차이면 단순한 쪽 채택. 집계 방식: 학습 대상 99건(최종 결과=낙찰, bad_lowest=0, bad_ratio=0, bad_bid=0), 매각 시점은 villa_flag=1·parse_fail=0 전체 863건. 상세: `results/exp005_auction.md` 표1~9.
+  - 결과 파일: `results/exp005_auction.md`, `results/figures/exp005_km.png`, `data/processed/onbid_features.parquet`(로컬, 커밋 안 함), `data/processed/exp005_rates.parquet`(로컬, 커밋 안 함), `src/onbid_features.py`, `src/auction_rate.py`, `src/time_to_sale.py`
+- 주의: bad_lowest 진단(표1)에서 1회차 최저가 비율이 105~112% 구간에 몰린다는 이전 설명(SYN-004 등록 시 비고)은 과소평가였다 — 실제로는 14.2%만 그 구간에 있고 중앙값은 120%다(결과를 본 뒤 기각 기준을 바꾼 것이 아니라 기록용 진단이므로 판정에는 영향 없음). 전체 863건 중 낙찰은 105건(12.2%)뿐이라 Kaplan-Meier 중앙 매각 시점이 정의되지 않는다(표8) — 예상과 달리 "매각까지 걸리는 시간"을 중앙값으로 답할 수 없었다. build_fail 33.3%는 EXP-003의 지번 연결률(66.7%)과 정확히 일치해 검증된 값이다.
+- 판정과 이유: **rho_appr: 채택 M2. rho_mkt: 채택 M2.** 두 지표 모두 LOO MdAE가 가장 낮고, 더 단순한 M0·M1과 1.0%p 이상 차이가 나 사전 규칙의 예외(단순 후보 우선) 조건을 충족하지 않는다. 민감도(bad_lowest 포함, 표7)에서도 결론이 바뀌지 않는다.
 - 변경 이력: 없음
-- 다음: (실행 후 기록)
+- 다음: rho_mkt의 LOO MdAE(14.92%p)가 rho_appr(7.00%p)보다 두 배 높아 EXP-004 시세 모델 오차가 그대로 전파됨 — 회수액 추정 단계에서 rho_appr과 rho_mkt 중 어느 쪽을 우선할지 결정 필요. 취소를 별도 사건으로 보는 경쟁위험 모형(사용자 결정, 2026-11-04).
 
 ---
 
