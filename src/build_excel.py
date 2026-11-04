@@ -49,13 +49,13 @@ def set_cell(ws, addr, value, kind="value", formula=None, number_format=None):
     return cell
 
 
-def add_list_validation(ws, addr, options_or_range):
+def add_list_validation(ws, addr, options_or_range, allow_blank=False):
     if options_or_range.startswith("="):
-        dv = DataValidation(type="list", formula1=options_or_range[1:], allow_blank=False)
+        dv = DataValidation(type="list", formula1=options_or_range[1:], allow_blank=allow_blank)
     else:
-        dv = DataValidation(type="list", formula1=f'"{options_or_range}"', allow_blank=False)
+        dv = DataValidation(type="list", formula1=f'"{options_or_range}"', allow_blank=allow_blank)
+    dv.sqref = addr
     ws.add_data_validation(dv)
-    dv.add(ws[addr])
 
 
 # ---------------------------------------------------------------- 가정 ----
@@ -77,6 +77,7 @@ def build_assumptions_sheet(wb):
         ("최우선변제_최대지급_만원", 5500, "서울 소액임차인 최우선변제 현행 기준표(법령 원문 확인 필요)", None),
         ("최우선변제_매각가비율한도", 0.5, "사용자 결정 — 최우선변제 합계는 매각가의 1/2 한도", None),
         ("근저당_설정일", "2023-03-01", "사용자 결정(가상값) — 1순위 근저당, 최우선변제 현행 기준표 적용", None),
+        ("깡통_보증금비율", 0.9, "사용자 결정 2026-11-04(가상값) — 보증금_깡통 = 추정시세 × 이 비율", None),
     ]
     for i, (name, value, note, formula) in enumerate(rows, start=2):
         set_cell(ws, f"A{i}", name)
@@ -117,6 +118,7 @@ def build_review_sheet(wb, portfolio):
         "집행비용_만원", "남은1_만원", "최우선변제후보_만원", "최우선변제상한_만원", "최우선변제_만원",
         "남은2_만원", "당해세지급_만원", "남은3_만원", "보증금잔액_만원", "보증금잔액지급_만원",
         "남은4_본채권전_만원", "채권최고액_만원", "R_회수액_만원", "PV_만원", "LGD",
+        "보증금시나리오_개별",
     ]
     for j, h in enumerate(headers, start=1):
         set_cell(ws, f"{get_column_letter(j)}1", h, "header")
@@ -136,9 +138,11 @@ def build_review_sheet(wb, portfolio):
         set_cell(ws, f"K{i}", None, formula=f"=H{i}*가정!$B$2", number_format=MANWON_FMT)
         set_cell(ws, f"L{i}", 0, "input", number_format=MANWON_FMT)
         set_cell(ws, f"M{i}", round(row["보증금_기본"] / 10000, 1), "input", number_format=MANWON_FMT)
-        set_cell(ws, f"N{i}", None, formula=f"=H{i}*0.9", number_format=MANWON_FMT)
+        set_cell(ws, f"N{i}", None, formula=f"=H{i}*가정!$B$15", number_format=MANWON_FMT)
         set_cell(ws, f"O{i}", None,
-                  formula=f'=CHOOSE(MATCH(가정!$B$19,{{"없음","기본","깡통"}},0),L{i},M{i},N{i})',
+                  formula=(f'=IF(AI{i}="",'
+                           f'CHOOSE(MATCH(가정!$B$19,{{"없음","기본","깡통"}},0),L{i},M{i},N{i}),'
+                           f'CHOOSE(MATCH(AI{i},{{"없음","기본","깡통"}},0),L{i},M{i},N{i}))'),
                   number_format=MANWON_FMT)
         set_cell(ws, f"P{i}", round(row["낙찰가"] / 10000, 1) if pd.notna(row["낙찰가"]) else None, "input",
                   number_format=MANWON_FMT)
@@ -163,6 +167,9 @@ def build_review_sheet(wb, portfolio):
         set_cell(ws, f"AF{i}", None, formula=f'=IFERROR(MAX(MIN(AE{i},S{i},AD{i}),0),"")', number_format=MANWON_FMT)
         set_cell(ws, f"AG{i}", None, formula=f'=IFERROR(AF{i}/(1+가정!$B$10)^(가정!$B$20/12),"")', number_format=MANWON_FMT)
         set_cell(ws, f"AH{i}", None, formula=f'=IFERROR(IF(K{i}=0,"",1-AG{i}/K{i}),"")', number_format=PCT_FMT)
+        set_cell(ws, f"AI{i}", None, "input")
+
+    add_list_validation(ws, f"AI2:AI{N_ITEMS + 1}", "없음,기본,깡통", allow_blank=True)
 
     last = N_ITEMS + 1
     lgd_col = "AH"
@@ -395,6 +402,9 @@ def build_sources_sheet(wb):
         ("전세·월세 보증금 혼재", "results/exp006_mixture.md 해석 참조"),
         ("인수부담 의심 집단 보증금비율 유효 6건(표본 작음)", "results/exp006_mixture.md 표5 참조"),
         ("EXP-006 가설(혼합 구조) 자체는 미지지로 종료됨 — 이번 실험은 EXP-005 단일 M2 유지 전제로 진행", "results/exp006_mixture.md 판정 참조"),
+        ("", ""),
+        ("음수 LGD", "EAD는 대출원금이고 회수액에는 연체이자가 포함돼, 회수액이 원금을 넘으면 LGD가 음수가 된다(보증금 없음 시나리오 3건, 최소 −2.9%)."),
+        ("숨김 시트 _계산", "시나리오·민감도 계산용 중간 시트(360행)."),
     ]
     for i, (a, b) in enumerate(lines, start=1):
         bold = a and not b and a not in ("",) and i != 1
