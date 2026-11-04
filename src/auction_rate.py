@@ -1,4 +1,7 @@
-"""EXP-005: 공매 빌라 낙찰가율(rho_appr, rho_mkt) 추정. M0/M1/M2 후보를 LOO MdAE로 비교·채택한다."""
+"""EXP-005: 공매 빌라 낙찰가율(rho_appr, rho_mkt) 추정. M0/M1/M2 후보를 LOO MdAE로 비교·채택한다.
+
+2026-11-04 정정: LOO 예측을 평균에서 중앙값으로 수정. SYN-004-v2 기반 SYN-005-v2(onbid_features_v2.parquet)를
+읽도록 바꾸고 출력을 exp005_rates_v2.parquet로 분리했다."""
 
 from pathlib import Path
 
@@ -6,8 +9,8 @@ import numpy as np
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parent.parent
-FEATURES_PARQUET = ROOT / "data" / "processed" / "onbid_features.parquet"
-RATES_PARQUET = ROOT / "data" / "processed" / "exp005_rates.parquet"
+FEATURES_PARQUET = ROOT / "data" / "processed" / "onbid_features_v2.parquet"
+RATES_PARQUET = ROOT / "data" / "processed" / "exp005_rates_v2.parquet"
 
 ROUND_BINS = [(1, 2), (3, 5), (6, 9), (10, np.inf)]
 ROUND_LABELS = ["1~2회", "3~5회", "6~9회", "10회 이상"]
@@ -64,10 +67,11 @@ def build_merged_bin_map(df):
 
 def loo_mdae_m0(values):
     n = len(values)
-    total = values.sum()
-    preds = (total - values) / (n - 1)
+    preds = np.empty(n)
+    for i in range(n):
+        preds[i] = np.median(np.delete(values, i)) if n > 1 else np.nan
     ae = np.abs(values - preds)
-    return float(np.median(ae)), preds
+    return float(np.nanmedian(ae)), preds
 
 
 def loo_mdae_m1(df, value_col, bin_col):
@@ -78,8 +82,8 @@ def loo_mdae_m1(df, value_col, bin_col):
         idx = np.where(bins == b)[0]
         v = values[idx]
         n = len(v)
-        total = v.sum()
-        preds[idx] = (total - v) / (n - 1) if n > 1 else np.nan
+        for pos, i in enumerate(idx):
+            preds[i] = np.median(np.delete(v, pos)) if n > 1 else np.nan
     ae = np.abs(values - preds)
     return float(np.nanmedian(ae)), preds
 

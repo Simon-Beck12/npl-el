@@ -1,8 +1,11 @@
-"""SYN-005: 공매 빌라 물건 피처(좌표, 층, 연식, 추정 시세) 생성.
+"""SYN-005-v2: 공매 빌라 물건 피처(좌표, 층, 연식, 추정 시세) 생성.
 
-데이터 소스: SYN-004(villa_flag=1, parse_fail=0, 863건), SYN-002(지오코딩 캐시, 재사용만),
+데이터 소스: SYN-004-v2(villa_flag=1, parse_fail=0, 863건), SYN-002(지오코딩 캐시, 재사용만),
 SYN-001(건축년도 연결, 시세 인덱스). 시세 모델은 EXP-004의 F3 설정(data/processed/exp004_fold_tuning.csv)을
 그대로 읽어 쓴다 — 다시 튜닝하지 않는다.
+
+2026-11-04 정정: SYN-004-v2(onbid_items_v2.parquet, 감정가·최종 회차 최저가 비율 정정)를 읽도록
+바꾸고 출력을 onbid_features_v2.parquet로 분리했다. 기존 v1 파일은 덮어쓰지 않는다.
 """
 
 import os
@@ -25,12 +28,12 @@ from split import apply_common_filter, add_contract_date, DV02_FOLDS
 load_dotenv()
 
 ROOT = Path(__file__).resolve().parent.parent
-ITEMS_PARQUET = ROOT / "data" / "processed" / "onbid_items.parquet"
+ITEMS_PARQUET = ROOT / "data" / "processed" / "onbid_items_v2.parquet"
 ROUNDS_PARQUET = ROOT / "data" / "processed" / "onbid_rounds_raw.parquet"
 SYN002_CACHE_CSV = ROOT / "data" / "processed" / "geocode_cache.csv"
 NEW_CACHE_CSV = ROOT / "data" / "processed" / "geocode_cache_onbid.csv"
 TUNING_CSV = ROOT / "data" / "processed" / "exp004_fold_tuning.csv"
-OUT_PARQUET = ROOT / "data" / "processed" / "onbid_features.parquet"
+OUT_PARQUET = ROOT / "data" / "processed" / "onbid_features_v2.parquet"
 
 KAKAO_KEY = os.getenv("KAKAO_REST_API_KEY")
 KAKAO_URL = "https://dapi.kakao.com/v2/local/search/address.json"
@@ -66,6 +69,12 @@ def extract_floor(name):
         if len(digits) >= 3:
             return float(int(digits[:-2])), 0
     return None, 1
+
+
+def load_onbid_target_v2():
+    """ow.load_onbid_target()과 같은 필터(villa_flag=1, parse_fail=0)를 이 파일의 ITEMS_PARQUET(v2)에 적용."""
+    items = pd.read_parquet(ITEMS_PARQUET)
+    return items[(items["villa_flag"] == 1) & (items["parse_fail"] == 0)].copy()
 
 
 def load_last_round_names():
@@ -184,8 +193,8 @@ def main():
     k, weights = load_f3_setting()
     print(f"EXP-004 F3 설정 사용: k={k}, weights={weights}")
 
-    onbid = ow.load_onbid_target()
-    print(f"온비드 대상(villa_flag=1, parse_fail=0): {len(onbid):,}건")
+    onbid = load_onbid_target_v2()
+    print(f"온비드 대상(villa_flag=1, parse_fail=0, SYN-004-v2): {len(onbid):,}건")
 
     names = load_last_round_names()
     onbid = onbid.merge(names, on="cltrMngNo", how="left")

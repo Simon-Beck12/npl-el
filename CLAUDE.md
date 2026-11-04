@@ -1,6 +1,6 @@
 # npl-el
 
-과제 한 줄 요약: 확인 필요
+과제 한 줄 요약: 서울 빌라 NPL 담보의 시장가치·공매 낙찰가율·매각 시점을 추정해 회수액(LGD)을 계산한다
 
 ## 실험 기록 (필수)
 - 규칙: `docs/TRACKING_RULES.md`. 실험 대장·명세: `docs/EXPERIMENTS.md`. 데이터셋: `docs/DATASETS.md`.
