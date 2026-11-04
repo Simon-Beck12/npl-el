@@ -26,7 +26,7 @@
 | EXP-004 | FAISS 탐색 범위 확장 (작은 k, 큰 위치 가중치) | 완료 | 채택(EXP-004) | 2026-11-04 01:47 | pooled MdAPE: EXP-003 14.58% / EXP-004 13.35% | 9943aea |
 | EXP-005 | 공매 빌라 낙찰가율·매각 시점 추정 | 완료 | 채택(M2, rho_appr·rho_mkt 둘 다) | 2026-11-04 10:42 | ~~LOO MdAE: rho_appr 7.00%p / rho_mkt 14.92%p~~ → LOO MdAE(정정): rho_appr 6.67%p / rho_mkt 14.00%p | 827e3a7 |
 | EXP-006 | 공매 데이터 정제 보강 + 인수부담 혼합 구조 검증 | 완료 | 기각(혼합 가설), M2 유지 | 2026-11-04 14:47 | 보증금비율 차이 −0.333(기준 ≥0.20, 방향 반전) | 1bac9ef |
-| EXP-007 | 회수액·LGD 계산 + 20건 포트폴리오 엑셀 검토표 | 계획 | - | - | - | - |
+| EXP-007 | 회수액·LGD 계산 + 20건 포트폴리오 엑셀 검토표 | 실행중 | - | 2026-11-04 18:08 | - | 76c78c4 |
 
 ---
 
@@ -353,9 +353,9 @@
 - 다음: (1) 극단 물건 9건의 원인 규명 — 매각물건명세서의 임차인·대항력 정보 확인 필요(보증금 지표로는 설명 안 됨). (2) 낙찰가율 분해(최저가 비율을 변수로, 이번 실험에서 보류한 표11 방향). (3) 회차 리셋(13.1%) 반영한 매각 시점 모형(지연 진입 KM 대체).
 
 ## EXP-007 | 회수액·LGD 계산 + 20건 포트폴리오 엑셀 검토표
-- 상태: 계획 | 판정: 미정
-- 시작: 미정 | 종료: 미정 | 커밋(시작 시점): 미정
-- 실행 명령: 미정 | 출력 폴더: results/, data/processed/(SYN-008·exp007_recovery.parquet, 커밋 안 함)
+- 상태: 실행중 | 판정: 미정
+- 시작: 2026-11-04 18:08 KST | 종료: 미정 | 커밋(시작 시점): 76c78c4
+- 실행 명령: src/recovery_engine.py(엔진) → tests/test_recovery_engine.py(uv run pytest) → src/rho_refit_v3.py(M2 재적합+LOO+두 경로 비교) → src/build_portfolio.py(SYN-008) → 엔진 그리드 실행(data/processed/exp007_recovery.parquet) → src/build_excel.py(results/npl_portfolio_review.xlsx) | 출력 폴더: results/, data/processed/(SYN-008·exp007_recovery.parquet·exp007_rho_loo_v3.parquet, 커밋 안 함)
 - 배경: EXP-005·EXP-006으로 낙찰가율·매각 시점 모델이 정해졌다. 이제 실제 채권(가상 조건)을 붙여 회수액·LGD까지 계산하고, 검토 가능한 엑셀 산출물을 만든다.
 - 목적: 공매 빌라 20건 포트폴리오에 가상 채권 조건을 붙여 회수액·LGD를 계산하고, 수식으로 연결된 엑셀 검토표와 README를 만든다.
 - [하지 말 것] (그대로 옮김):
