@@ -17,6 +17,7 @@
 !/configs/
 !/scripts/
 !/results/
+!/v2/
 # 허용 폴더 안에서도 제외
 **/__pycache__/
 **/.ipynb_checkpoints/
