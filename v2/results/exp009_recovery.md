@@ -82,7 +82,7 @@
 
 ## 주의
 
-- v2 필터는 공공기관 거래 제외를 포함하지 않는다(EXP-008 설계 그대로, 설계 누락이 아니라 사전 등록된 필터 3개만 쓴 결과) — 테스트 건수가 v1보다 4건 많다.
+- v2 필터는 공공기관 거래 제외를 포함하지 않는다(설계 누락) — 테스트 건수가 v1보다 4건 많다.
 - rho 계산 풀(87건) 중 4건도 v2 시세 추정에 실패했다(2024-11 cutoff, 동일 이유) — 유효 83건으로 분위수를 계산했다.
 - 결과 파일: `v2/data/processed/portfolio_v2.parquet`(SYN-009, 18행), `v2/data/processed/exp009_recovery_v2.parquet`(486행), `v2/results/npl_v2_review.xlsx`.
 

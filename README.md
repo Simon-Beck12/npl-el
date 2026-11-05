@@ -55,7 +55,7 @@ flowchart LR
 | EXP-004 | FAISS 탐색 범위 확장 | 채택(EXP-004, k=2, 위치가중치16.0) | pooled MdAPE: 14.58% → 13.35% | `results/exp004_faiss_ext.md` | |
 | EXP-005 | 공매 낙찰가율·매각 시점 | 채택(M2) | LOO MdAE(정정): rho_appr 6.67%p / rho_mkt 14.00%p | `results/exp005_auction.md` | |
 | EXP-006 | 공매 정제 보강 + 인수부담 혼합 구조 | 기각(혼합 가설), M2 유지 | 보증금비율 차이 −0.333(기준 ≥0.20, 방향 반전) | `results/exp006_mixture.md` | |
-| EXP-007 | 회수액·LGD + 20건 포트폴리오 엑셀 | 완료 기준 충족 | 포트폴리오 LGD(시세/보증금기본/기본시나리오) 57.4% | `results/exp007_recovery.md`, `results/npl_portfolio_review.xlsx` | 엑셀 재계산 검증 완료(LibreOffice, 수식 오류 0건, 요약값 표4와 일치) |
+| EXP-007 | 회수액·LGD + 20건 포트폴리오 엑셀 | 완료 기준 충족 | 포트폴리오 LGD(시세/보증금기본/기본시나리오) 57.4%(20건) (EXP-010: 일괄매각 의심 1건 제외 시 79.0%, 19건) | `results/exp007_recovery.md`, `results/npl_portfolio_review.xlsx` | 엑셀 재계산 검증 완료(LibreOffice, 수식 오류 0건, 요약값 표4와 일치) |
 
 숫자는 모두 각 결과 파일에서 그대로 옮겼다.
 
