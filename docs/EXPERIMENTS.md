@@ -34,6 +34,7 @@
 | EXP-010 | 일괄매각 의심 면적 필터 + v1·v2 LGD 재계산 | 완료 | 완료 기준 충족 | 2026-11-05 18:00 | v1 57.4%→79.0%(19건), v2 87.5%→87.5%(18건, 변화 없음) | 25ff949 |
 | EXP-011 | v2 서빙 1단계 (FastAPI + Docker Compose) | 완료 | 완료 기준 충족 | 2026-11-06 | docker API 3개 응답, /recovery LGD 58.6010%(기대 58.6%) | 154221c |
 | EXP-012 | v2 서빙 2단계 (MLflow 추적·레지스트리) | 완료 | 완료 기준 충족 | 2026-11-06 | 재현 A 차이 0.00%p, 재현 B 차이 0, docker API npl-el-price v3 champion 응답 | 4be6ed2 |
+| EXP-013 | v2 서빙 3단계 (Airflow 일일 배치 재채점) | 진행 중 | - | 2026-11-07 (기록 예정) | - | (다음 커밋에서 기록) |
 
 ---
 
@@ -664,6 +665,50 @@
 - 판정과 이유: 완료 기준 충족(재현 A·B, pytest, docker API 3개 응답·LGD 기준 모두 충족, `git status`에 `artifact/`·`mlflow_data/` 없음 확인).
 - 변경 이력: Dockerfile의 libgomp 심볼릭 링크(EXP-011)를 apt 정식 설치로 교체(지시대로). 지시된 패키지 목록(mlflow)에 버전 `3.18.0`을 추가. `pyfunc_model.py`를 "models from code" 방식으로 바꾸고 Dockerfile COPY 목록에 추가(지시 범위를 다소 넘는 변경, 위 "주의"에 사유 기록). `docker-compose.yml`의 `--allowed-hosts`에 포트 포함 호스트를 추가(지시 범위를 다소 넘는 변경).
 - 다음: MLflow 모델 교체 시 api 컨테이너 재시작이 필요하다(무중단 핫리로드는 이번 범위 밖) — 운영 중 모델 교체 절차를 만들지는 사용자 결정 필요.
+
+---
+
+## EXP-013 | v2 서빙 3단계 (Airflow 일일 배치 재채점)
+- 상태: 진행 중 | 판정: -
+- 시작: 2026-11-07 (추정 소요 1~2시간) | 종료: - | 커밋(등록 시점): (다음 커밋에서 기록)
+- 실행 명령: `docker compose up`(mlflow+api+airflow), DAG `npl_el_daily_rescore` | 출력 폴더: `v2/serving/airflow/`
+- 배경: EXP-012(MLflow 레지스트리, champion 별칭)의 champion 모델을 매일 자동으로 배치 채점하고 실행 기록을 남긴다.
+- 목적: Airflow DAG로 champion 모델의 배치 채점을 매일 자동 실행하고, 실행 기록을 MLflow에 남긴다. 함께 `/valuation` 주소 입력을 필수로 바꾼다.
+- [하지 말 것] (그대로 옮김):
+  - `v2/price_model.py`, `v2/recovery.py`, `src/` 아래 파일을 수정하지 않는다.
+  - 모델 설정, 등록 모델(npl-el-price), champion 별칭을 바꾸지 않는다.
+  - 테스트 기대값(MdAPE 11.5635%, 효창동 LGD 58.6010%)을 바꾸지 않는다.
+  - airflow 로그·DB·출력 파일, `mlflow_data/`, `artifact/`, `data/`, 1MB 넘는 파일을 커밋하지 않는다.
+  - Airflow 관리자 비밀번호를 코드·로그·커밋·보고에 쓰지 않는다.
+  - 컴퓨터 본체에 apt로 설치하지 않는다. sudo를 쓰지 않는다. apt는 Dockerfile 안에서만 쓴다.
+  - 외부 클라우드에 배포하지 않는다. force push 하지 않는다.
+  - 오류가 나거나 숫자가 기준을 벗어나면, 원인을 찾았더라도 고쳐서 다시 돌리기 전에 멈추고 보고한다.
+- 완료 기준:
+  - 주소 없는 `/valuation` 요청이 422이고, pytest가 모두 통과한다.
+  - DAG 1회 실행에서 작업 4개가 모두 성공한다.
+  - DAG 출력과 `batch_score.py` 직접 실행 결과의 시세 차이가 3행 모두 0이다.
+  - MLflow `npl-el-batch` 실험에 run 1개 이상이 있고, 모델 버전이 기록되어 있다.
+  - 필수 컬럼이 빠진 입력에서 check_input이 실패한다.
+- 멈춤 지점(사전 고정): 3단계 예상 시간이 1시간을 넘으면 멈춤(→ 사용자에게 사전 보고, "예, 이어서 진행" 승인받음, 2026-11-07). Airflow 이미지 빌드·가상환경 설치 실패(패키지 충돌 포함) 시 멈춤. DAG 작업이 하나라도 실패하면 멈춤. 재현 확인(시세 차이 0)이 깨지면 멈춤.
+- 절차:
+  1. git pull → 완료(2026-11-07, 변경 없음)
+  2. docs/EXPERIMENTS.md에 EXP-013 실행 전 기록 → 이 커밋
+  3. 전체 작업 예상 시간 계산(1시간 넘으면 멈춤) → 사전 승인받음
+  4. `/valuation` 주소 필수화(app.py 422, batch_score.py 오류 행 표시), 테스트 추가, pytest 확인
+  5. `v2/serving/airflow/Dockerfile` 작성(apache/airflow 공식 이미지 + `/opt/npl-venv` 가상환경 + libgomp1 apt)
+  6. `v2/serving/airflow/dags/npl_el_daily_rescore.py` 작성(4개 작업: check_input→score→validate_output→log_to_mlflow)
+  7. docker-compose.yml에 airflow 서비스 추가(mlflow 네트워크 공유, 포트 8080, volume), `.gitignore`에 airflow 로그·DB·output 추가
+  8. docker compose up -d --build(mlflow+api+airflow)
+  9. DAG 수동 1회 실행 → 4개 작업 성공 확인, 재현 확인(시세 차이 0), MLflow npl-el-batch run 확인
+  10. 실패 경로 확인(필수 컬럼 누락 입력으로 check_input 실패 확인) → 확인 후 그 파일 삭제
+  11. docker compose down
+  12. README.md에 3단계 추가(DAG 구조, 수동 실행, 결과 위치, 모델 교체 절차)
+  13. EXPERIMENTS.md 종료 기록, git status 확인 후 커밋·push
+- 결과: (실행 후 기록)
+- 주의:
+- 판정과 이유:
+- 변경 이력:
+- 다음:
 
 ---
 
