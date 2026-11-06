@@ -32,6 +32,7 @@
 | EXP-008 | v2 가격 추정 (LightGBM + k-NN 피처) | 완료 | 채택(G2) | 2026-11-05 15:30 | 테스트 MdAPE: B0 24.85% / A 13.43% / G1 12.21% / G2 11.56% | a13b4ab |
 | EXP-009 | v2 회수액·LGD (6줄 계산, 조건 단순화) | 완료 | 완료 기준 충족 | 2026-11-05 15:45 | 포트폴리오 LGD(18건, rho기본/보증금기본/24개월) 87.5%, v1 대비 +30.1%p(구성21.4%p+방식8.7%p) | 5cc2c85 |
 | EXP-010 | 일괄매각 의심 면적 필터 + v1·v2 LGD 재계산 | 완료 | 완료 기준 충족 | 2026-11-05 18:00 | v1 57.4%→79.0%(19건), v2 87.5%→87.5%(18건, 변화 없음) | 25ff949 |
+| EXP-011 | v2 서빙 1단계 (FastAPI + Docker Compose) | 진행 중 | - | 2026-11-06 (기록 예정) | - | (다음 커밋에서 기록) |
 
 ---
 
@@ -543,6 +544,51 @@
 - 판정과 이유: 완료 기준 충족. 가설 채택/기각이 아니라 민감도 점검이라 완료 기준 충족 여부로 판정한다. 면적 기준 외 조건은 추가하지 않았고, 기존 결과 파일(`results/exp007_recovery.md`, `v2/results/exp009_recovery.md`의 표·숫자)은 바꾸지 않았다(새 파일로 저장).
 - 변경 이력: `v2/results/exp009_recovery.md`의 공공기관 필터 문구를 "설계 누락이 아니라 사전 등록된 필터 3개만 쓴 결과"에서 "설계 누락"으로 통일(사용자 지시, 숫자 변경 없음).
 - 다음: EXP-007·009의 포트폴리오 선택 규칙(seed=42)에 면적 상한을 넣어 재선택할지는 사용자 결정 필요(기록, 결정 아님) — 넣으면 포트폴리오 구성이 바뀌어 두 실험을 재실행해야 한다.
+
+---
+
+## EXP-011 | v2 서빙 1단계 (FastAPI + Docker Compose)
+- 상태: 진행 중 | 판정: -
+- 시작: 2026-11-06 (추정 소요 1~2시간) | 종료: - | 커밋(등록 시점): (다음 커밋에서 기록)
+- 실행 명령: `v2/serving/build_artifact.py`, `v2/serving/app.py`(uvicorn), `docker compose up`(예정) | 출력 폴더: `v2/serving/`
+- 배경: EXP-008(v2 가격 모델 G2 채택)·EXP-009(v2 회수액 6줄 계산)의 로직을 API·배치로 호출 가능하게 만든다.
+- 목적: v2 시세 모델(G2)과 회수액 계산을 FastAPI API와 배치 스크립트로 서빙하고, Docker Compose로 띄운다(서빙 1단계, 모델 재학습·설정 변경 없음).
+- 참고: 리모트에 겹치는 내용의 `origin/feat/v2-serving` 브랜치(커밋 a498684)가 이미 존재하나, 사용자 결정(2026-11-06)에 따라 무시하고 main 기준으로 새로 작성한다.
+- [하지 말 것] (그대로 옮김):
+  - 기존 .py 파일(`v2/price_model.py`, `v2/recovery.py` 등)을 수정하지 않는다. 새 폴더 `v2/serving/` 아래에만 만든다.
+  - 모델 설정과 학습 데이터를 바꾸지 않는다. 학습+검증 45,634건, num_leaves 63, min_child_samples 20, 2,554회 그대로 쓴다.
+  - `data/`, 모델 파일(`artifact/`), 1MB 넘는 파일을 커밋하지 않는다. `artifact/`는 `.gitignore`에 넣는다.
+  - 모델 파일과 데이터를 Docker 이미지 안에 복사하지 않는다. Compose volume으로 연결한다.
+  - API 키를 코드·로그·커밋에 넣지 않는다. 지오코딩은 이번 범위에서 뺀다.
+  - 시스템 패키지(apt)를 설치하지 않는다. Python 패키지는 `v2/serving/requirements.txt`에 적고 pip로 설치한다.
+  - MLflow, Airflow는 이번 단계에서 쓰지 않는다.
+  - 외부 클라우드에 배포하지 않는다. force push 하지 않는다.
+- 완료 기준:
+  - 5단계 재현 MdAPE가 11.56%(±0.01%p)다.
+  - pytest `v2/serving/tests`가 모두 통과한다.
+  - Docker Compose로 띄운 API가 `/health`, `/valuation`, `/recovery`에 응답한다.
+  - `git status`에 `artifact/` 파일이 보이지 않는다.
+- 재현 기준(사전 고정): 테스트 MdAPE 11.56%(±0.01%p), 효창동 예시 LGD 58.6%(±0.1%p, market_price=48974, rho=0.644620, deposit=14700, ead=34281.8, months=24).
+- 멈춤 지점(사전 고정): 5단계 재현 MdAPE가 허용 범위를 벗어나면 멈춤. 9단계 효창동 LGD가 58.6%(±0.1%p)가 아니면 멈춤. docker compose 빌드·실행 실패 시 멈춤.
+- 절차:
+  1. git pull → 완료(2026-11-06, 변경 없음, 단 origin/feat/v2-serving 신규 브랜치 확인)
+  2. docs/EXPERIMENTS.md에 EXP-011 실행 전 기록 → 이 커밋
+  3. `v2/serving/requirements.txt` 작성
+  4. `v2/serving/build_artifact.py` 작성(G2 재학습 → model.txt·ref.parquet·meta.json)
+  5. 재현 확인(저장된 artifact만으로 테스트 7,561건 재예측, test_mdape를 meta.json에 추가)
+  6. `v2/serving/model_loader.py` 작성(`load_model(model_dir)`, 경로는 환경변수 MODEL_DIR)
+  7. `v2/serving/app.py` 작성(FastAPI: POST /valuation, POST /recovery, GET /health, 입력 검증)
+  8. `v2/serving/batch_score.py` 작성 + 예시 입력 CSV 3행
+  9. `v2/serving/tests/test_api.py` 작성(효창동 LGD, 422 검증, /health)
+  10. `v2/serving/Dockerfile`·`docker-compose.yml` 작성(volume 연결, MODEL_DIR=/app/artifact)
+  11. docker compose up -d --build → curl로 3개 엔드포인트 확인 → docker compose down
+  12. `v2/serving/README.md` 작성
+  13. EXPERIMENTS.md 종료 기록, 코드만 커밋·push(artifact/ 제외 확인)
+- 결과: (실행 후 기록)
+- 주의:
+- 판정과 이유:
+- 변경 이력:
+- 다음:
 
 ---
 
