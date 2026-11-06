@@ -25,6 +25,10 @@
 **/outputs/
 **/data/
 **/artifact/
+**/mlflow_data/
+**/mlruns/
+**/mlartifacts/
+mlflow.db
 .env
 *.zip
 *.tar

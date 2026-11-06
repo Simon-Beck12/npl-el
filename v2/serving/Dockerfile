@@ -5,18 +5,19 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+# python:3.12-slim에는 libgomp(OpenMP 런타임)가 없어 lightgbm import가 실패한다.
+# EXP-011에서는 apt 없이 faiss-cpu 휠의 libgomp 사본에 심볼릭 링크로 해결했으나,
+# EXP-012 지시로 이미지 안 정식 설치로 바꾼다(apt는 Dockerfile 안에서만 쓴다, 본체에는 쓰지 않는다).
+RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 && rm -rf /var/lib/apt/lists/*
+
 COPY v2/serving/requirements.txt v2/serving/requirements.txt
 RUN pip install --no-cache-dir -r v2/serving/requirements.txt
-
-# python:3.12-slim에는 libgomp(OpenMP 런타임)가 없어 lightgbm import가 실패한다.
-# apt 설치 없이, faiss-cpu 휠이 이미 들고 있는 libgomp 사본에 표준 이름으로 심볼릭 링크를 만들어 쓴다.
-RUN cd /usr/local/lib/python3.12/site-packages/faiss_cpu.libs && ln -s libgomp-*.so.1.0.0 libgomp.so.1
-ENV LD_LIBRARY_PATH=/usr/local/lib/python3.12/site-packages/faiss_cpu.libs
 
 COPY src/features.py src/split.py src/knn_comps.py src/
 COPY v2/price_model.py v2/recovery.py v2/
 COPY v2/serving/model_loader.py v2/serving/valuation_core.py v2/serving/app.py \
-     v2/serving/batch_score.py v2/serving/build_artifact.py v2/serving/
+     v2/serving/batch_score.py v2/serving/build_artifact.py v2/serving/pyfunc_model.py \
+     v2/serving/
 
 ENV MODEL_DIR=/app/artifact
 WORKDIR /app/v2/serving

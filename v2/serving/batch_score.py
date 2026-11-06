@@ -38,17 +38,23 @@ def score_row(row, ref, booster):
     return pd.Series({"시세": val["market_price"], "S": rec["S"], "R": rec["R"], "PV": rec["PV"], "LGD": rec["LGD"]})
 
 
+DEFAULT_MODEL_URI = "models:/npl-el-price@champion"
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--input", default=str(DEFAULT_INPUT))
     parser.add_argument("--output", default=None)
+    parser.add_argument("--model-uri", default=DEFAULT_MODEL_URI,
+                         help="MLflow 모델 URI. 빈 문자열(--model-uri '')을 주면 MODEL_DIR(1단계 방식)을 쓴다.")
     args = parser.parse_args()
 
     input_path = Path(args.input)
     output_path = Path(args.output) if args.output else input_path.with_name(input_path.stem + "_scored.csv")
 
     df = pd.read_csv(input_path)
-    booster, ref, meta = load_model()
+    booster, ref, meta = load_model(model_uri=args.model_uri)
+    print(f"모델 소스: {meta['source']} (test_mdape={meta.get('test_mdape')})")
     scored = df.apply(lambda row: score_row(row, ref, booster), axis=1)
     out = pd.concat([df, scored], axis=1)
     out.to_csv(output_path, index=False)

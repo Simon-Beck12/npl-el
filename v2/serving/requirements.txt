@@ -9,3 +9,4 @@ numpy==2.5.4
 scipy==1.18.1
 pyarrow==26.0.0
 faiss-cpu==1.15.1
+mlflow==3.18.0

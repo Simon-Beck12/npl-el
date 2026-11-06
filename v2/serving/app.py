@@ -78,7 +78,16 @@ class RecoveryResponse(BaseModel):
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "model_version": app.version, "meta": _meta}
+    return {
+        "status": "ok",
+        "model_version": app.version,
+        "model_name": _meta.get("registered_model_name"),
+        "model_registry_version": _meta.get("version"),
+        "model_alias": _meta.get("alias"),
+        "run_id": _meta.get("run_id"),
+        "test_mdape": _meta.get("test_mdape"),
+        "meta": _meta,
+    }
 
 
 @app.post("/valuation", response_model=ValuationResponse)

@@ -33,7 +33,7 @@
 | EXP-009 | v2 회수액·LGD (6줄 계산, 조건 단순화) | 완료 | 완료 기준 충족 | 2026-11-05 15:45 | 포트폴리오 LGD(18건, rho기본/보증금기본/24개월) 87.5%, v1 대비 +30.1%p(구성21.4%p+방식8.7%p) | 5cc2c85 |
 | EXP-010 | 일괄매각 의심 면적 필터 + v1·v2 LGD 재계산 | 완료 | 완료 기준 충족 | 2026-11-05 18:00 | v1 57.4%→79.0%(19건), v2 87.5%→87.5%(18건, 변화 없음) | 25ff949 |
 | EXP-011 | v2 서빙 1단계 (FastAPI + Docker Compose) | 완료 | 완료 기준 충족 | 2026-11-06 | docker API 3개 응답, /recovery LGD 58.6010%(기대 58.6%) | 154221c |
-| EXP-012 | v2 서빙 2단계 (MLflow 추적·레지스트리) | 진행 중 | - | 2026-11-06 (기록 예정) | - | (다음 커밋에서 기록) |
+| EXP-012 | v2 서빙 2단계 (MLflow 추적·레지스트리) | 완료 | 완료 기준 충족 | 2026-11-06 | 재현 A 차이 0.00%p, 재현 B 차이 0, docker API npl-el-price v3 champion 응답 | (다음 커밋에서 기록) |
 
 ---
 
@@ -607,8 +607,8 @@
 ---
 
 ## EXP-012 | v2 서빙 2단계 (MLflow 추적·레지스트리)
-- 상태: 진행 중 | 판정: -
-- 시작: 2026-11-06 (추정 소요 1~2시간) | 종료: - | 커밋(등록 시점): (다음 커밋에서 기록)
+- 상태: 완료 | 판정: 완료 기준 충족
+- 시작: 2026-11-06 (추정 소요 1~2시간) | 종료: 2026-11-06 | 커밋(등록 시점): (다음 커밋에서 기록)
 - 실행 명령: `v2/serving/train_register.py`, `docker compose up`(mlflow+api) | 출력 폴더: `v2/serving/`
 - 배경: EXP-011(서빙 1단계, 로컬 파일 기반 model.txt/ref.parquet/meta.json)의 모델 버전·학습 기록을 MLflow로 관리한다.
 - 목적: v2 G2 모델의 학습 기록·버전을 MLflow 추적 서버·모델 레지스트리로 관리하고, API·배치 스크립트가 레지스트리의 champion 별칭 모델을 불러오게 한다.
@@ -643,11 +643,27 @@
   13. docker compose up -d --build(mlflow+api) → UI·curl 확인 → down
   14. README.md에 2단계 실행 순서 추가
   15. EXPERIMENTS.md 종료 기록, git status 확인 후 커밋·push
-- 결과: (실행 후 기록)
+- 결과:
+
+  | 확인 항목 | 결과 |
+  |---|---|
+  | 3단계: libgomp apt 정식 설치 후 1단계 curl 3개 | 모두 정상(응답 동일) |
+  | 재현 A: MLflow 모델(models:/npl-el-price@champion)로 테스트 7,561건 재예측 MdAPE | 11.563502%(차이 0.000000%p, 허용 0.01%p) |
+  | 재현 B: sample_input.csv 3행, 1단계(MODEL_DIR) vs 2단계(MODEL_URI) /valuation 시세 차이 | 0.0(3행 모두) |
+  | pytest(`v2/serving/tests`) | 9 passed(MLFLOW_TRACKING_URI 설정 시 전부 실행, 미설정 시 MLflow 테스트 1개 skip) |
+  | docker compose up -d --build(mlflow+api) → curl /health, /valuation, /recovery | 모두 200, `/health`가 npl-el-price v3·champion·run_id(458898d9...)·test_mdape 반환 |
+  | 범위 밖 입력(excluUseAr=0) /valuation | 422 |
+
+  - 지표 설명: MdAPE 차이(%p), 시세 차이(원 단위 절댓값), pytest pass/fail, HTTP 상태 코드. 임계값: MdAPE차이 ≤0.01%p, 시세차이=0, 효창동 LGD 58.6010%±0.1%p. 집계: `uv run python v2/serving/train_register.py`(MLFLOW_TRACKING_URI 지정), `uv run pytest v2/serving/tests/ -v`, `docker compose up -d --build` 후 curl(모두 로컬 실행, 콘솔 출력, 결과 파일 없음).
 - 주의:
-- 판정과 이유:
-- 변경 이력:
-- 다음:
+  - 재현 확인 A 1차 시도에서 MdAPE가 12.1388%로 기준을 벗어났다(멈춤 지점 해당 상황). 원인은 모델이 아니라 내 검증 스크립트였다 — 테스트셋 예측 호출 시 구·umdNm·jibun을 비워(None) 보내 same_bldg가 전부 0으로 계산됐다. 실제 테스트셋의 주소 컬럼을 그대로 넣어 다시 돌리자 11.563502%로 정확히 일치했다(차이 0.000000%p) — 모델·파이프라인 문제가 아니라 내 검증 방법 문제였음을 확인한 뒤 계속했다.
+  - MLflow에 `python_model=NplPriceModel()` 객체를 그대로 로그(cloudpickle)하면 API 컨테이너에서 `ModuleNotFoundError: No module named 'pyfunc_model'`로 로드가 실패했다 — "models from code" 방식(`mlflow.models.set_model`, `python_model=<파일 경로>`)으로 바꾸고 `Dockerfile`에 `pyfunc_model.py`를 추가해 해결했다.
+  - MLflow 서버 기본 아티팩트 저장(`--default-artifact-root`를 로컬 경로로 지정)은 클라이언트가 그 경로에 직접 파일시스템으로 접근하려 해, 호스트(클라이언트)와 컨테이너(서버)가 파일시스템을 공유하지 않는 이번 구성에서 `PermissionError: /mlflow_data`로 실패했다 — `--artifacts-destination`+`--serve-artifacts`(아티팩트 프록시)로 바꿔 해결했다.
+  - MLflow 3.x 서버의 Host 헤더 기반 DNS 리바인딩 방어 때문에 api 컨테이너(Host: `mlflow:5000`)와 호스트 클라이언트(Host: `localhost:5000`)가 둘 다 403으로 막혔다 — `--allowed-hosts`에 포트 포함 값을 넣어 해결했다(지시 범위 밖 변경, Dockerfile·compose 수정과 별개로 기록).
+  - `log_model`의 `artifact_path` 인자는 이 버전(mlflow 3.18.0)에서 deprecated였다(`Deprecated. Use name instead.`) — `name="model"`을 썼다(4단계 확인 사항).
+- 판정과 이유: 완료 기준 충족(재현 A·B, pytest, docker API 3개 응답·LGD 기준 모두 충족, `git status`에 `artifact/`·`mlflow_data/` 없음 확인).
+- 변경 이력: Dockerfile의 libgomp 심볼릭 링크(EXP-011)를 apt 정식 설치로 교체(지시대로). 지시된 패키지 목록(mlflow)에 버전 `3.18.0`을 추가. `pyfunc_model.py`를 "models from code" 방식으로 바꾸고 Dockerfile COPY 목록에 추가(지시 범위를 다소 넘는 변경, 위 "주의"에 사유 기록). `docker-compose.yml`의 `--allowed-hosts`에 포트 포함 호스트를 추가(지시 범위를 다소 넘는 변경).
+- 다음: MLflow 모델 교체 시 api 컨테이너 재시작이 필요하다(무중단 핫리로드는 이번 범위 밖) — 운영 중 모델 교체 절차를 만들지는 사용자 결정 필요.
 
 ---
 
