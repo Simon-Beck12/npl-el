@@ -1,0 +1,9 @@
+# 서빙 이미지 전용. 학습용 패키지(faiss, jupyter 등)는 넣지 않는다.
+# lightgbm·numpy·pandas·scipy는 저장소 루트 requirements.txt와 같은 버전으로 고정한다.
+lightgbm==4.7.0
+numpy==2.5.4
+pandas==3.1.0
+scipy==1.18.1
+fastapi==0.162.0
+uvicorn==0.54.0
+pydantic==2.13.5

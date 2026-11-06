@@ -1,0 +1,4 @@
+tests/
+__pycache__/
+export_artifacts.py
+artifacts/golden.json
