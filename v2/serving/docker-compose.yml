@@ -1,0 +1,11 @@
+services:
+  api:
+    build:
+      context: ../..
+      dockerfile: v2/serving/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - MODEL_DIR=/app/artifact
+    volumes:
+      - ./artifact:/app/artifact:ro
