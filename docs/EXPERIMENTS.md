@@ -32,7 +32,8 @@
 | EXP-008 | v2 가격 추정 (LightGBM + k-NN 피처) | 완료 | 채택(G2) | 2026-11-05 15:30 | 테스트 MdAPE: B0 24.85% / A 13.43% / G1 12.21% / G2 11.56% | a13b4ab |
 | EXP-009 | v2 회수액·LGD (6줄 계산, 조건 단순화) | 완료 | 완료 기준 충족 | 2026-11-05 15:45 | 포트폴리오 LGD(18건, rho기본/보증금기본/24개월) 87.5%, v1 대비 +30.1%p(구성21.4%p+방식8.7%p) | 5cc2c85 |
 | EXP-010 | 일괄매각 의심 면적 필터 + v1·v2 LGD 재계산 | 완료 | 완료 기준 충족 | 2026-11-05 18:00 | v1 57.4%→79.0%(19건), v2 87.5%→87.5%(18건, 변화 없음) | 25ff949 |
-| EXP-011 | v2 서빙 1단계 (FastAPI + Docker Compose) | 완료 | 완료 기준 충족 | 2026-11-06 | docker API 3개 응답, /recovery LGD 58.6010%(기대 58.6%) | (다음 커밋에서 기록) |
+| EXP-011 | v2 서빙 1단계 (FastAPI + Docker Compose) | 완료 | 완료 기준 충족 | 2026-11-06 | docker API 3개 응답, /recovery LGD 58.6010%(기대 58.6%) | 154221c |
+| EXP-012 | v2 서빙 2단계 (MLflow 추적·레지스트리) | 진행 중 | - | 2026-11-06 (기록 예정) | - | (다음 커밋에서 기록) |
 
 ---
 
@@ -549,7 +550,7 @@
 
 ## EXP-011 | v2 서빙 1단계 (FastAPI + Docker Compose)
 - 상태: 완료 | 판정: 완료 기준 충족
-- 시작: 2026-11-06 (추정 소요 1~2시간) | 종료: 2026-11-06 | 커밋(등록 시점): (다음 커밋에서 기록)
+- 시작: 2026-11-06 (추정 소요 1~2시간) | 종료: 2026-11-06 | 커밋(등록 시점): 154221c
 - 실행 명령: `v2/serving/build_artifact.py`, `v2/serving/app.py`(uvicorn), `docker compose up`(예정) | 출력 폴더: `v2/serving/`
 - 배경: EXP-008(v2 가격 모델 G2 채택)·EXP-009(v2 회수액 6줄 계산)의 로직을 API·배치로 호출 가능하게 만든다.
 - 목적: v2 시세 모델(G2)과 회수액 계산을 FastAPI API와 배치 스크립트로 서빙하고, Docker Compose로 띄운다(서빙 1단계, 모델 재학습·설정 변경 없음).
@@ -602,6 +603,51 @@
 - 판정과 이유: 완료 기준 충족(API 3개 엔드포인트 응답, LGD 기준 충족, 422 확인, 아티팩트 커밋 제외 확인).
 - 변경 이력: 사용자 결정(2026-11-06)으로 `origin/feat/v2-serving`(기존 겹치는 브랜치)을 무시하고 main 기준 새 작성으로 진행. 지시된 패키지 목록에 `faiss-cpu==1.15.1`을 추가(1차 보고에서 이미 고지). 2차 진행 중 Dockerfile에 libgomp 심볼릭 링크 2줄 추가(apt·sudo 미사용, 10단계 산출물 범위 내 수정, 지시 범위를 다소 넘는 변경이라 별도 기록).
 - 다음: 서빙 2단계(지오코딩 연동, 배치 스케줄링, 모니터링 등)는 사용자 결정 필요.
+
+---
+
+## EXP-012 | v2 서빙 2단계 (MLflow 추적·레지스트리)
+- 상태: 진행 중 | 판정: -
+- 시작: 2026-11-06 (추정 소요 1~2시간) | 종료: - | 커밋(등록 시점): (다음 커밋에서 기록)
+- 실행 명령: `v2/serving/train_register.py`, `docker compose up`(mlflow+api) | 출력 폴더: `v2/serving/`
+- 배경: EXP-011(서빙 1단계, 로컬 파일 기반 model.txt/ref.parquet/meta.json)의 모델 버전·학습 기록을 MLflow로 관리한다.
+- 목적: v2 G2 모델의 학습 기록·버전을 MLflow 추적 서버·모델 레지스트리로 관리하고, API·배치 스크립트가 레지스트리의 champion 별칭 모델을 불러오게 한다.
+- [하지 말 것] (그대로 옮김):
+  - `v2/price_model.py`, `v2/recovery.py`, `src/` 아래 파일을 수정하지 않는다.
+  - 모델 설정과 학습 데이터를 바꾸지 않는다. 학습+검증 45,634건, num_leaves 63, min_child_samples 20, 2,554회 그대로 쓴다.
+  - 테스트 기대값(MdAPE 11.5635%, 효창동 LGD 58.6010%)을 바꾸지 않는다.
+  - `mlflow.db`, `mlruns/`, `mlartifacts/`, `mlflow_data/`, `artifact/`, `data/`, 1MB 넘는 파일을 커밋하지 않는다.
+  - 컴퓨터 본체에 apt로 설치하지 않는다. sudo를 쓰지 않는다. apt는 Dockerfile 안에서만 쓴다.
+  - Airflow는 이번 단계에서 쓰지 않는다. 외부 클라우드에 배포하지 않는다. force push 하지 않는다.
+  - 오류가 나면 직접 고쳐서 재시작하지 않는다. 멈추고 보고한다.
+- 완료 기준:
+  - 재현 A: MLflow 모델의 테스트 MdAPE가 11.5635%(±0.01%p)다.
+  - 재현 B: 1단계와 2단계 `/valuation` 시세 차이가 3행 모두 0이다.
+  - pytest가 모두 통과한다.
+  - Docker Compose로 띄운 api의 `/health`가 npl-el-price, champion, run_id를 돌려주고, `/recovery` 효창동 LGD가 58.6010%(±0.1%p)다.
+- 재현 기준(사전 고정): MdAPE 11.5635%(±0.01%p), 효창동 LGD 58.6010%(±0.1%p), 1단계 API와 `/valuation` 결과 차이 0.
+- 멈춤 지점(사전 고정): 3단계 libgomp 정식 설치 후 1단계 curl 실패 시 멈춤. 재현 A·B가 기준을 벗어나면 멈춤. MLflow 서버 미기동·등록 실패 시 멈춤. 4단계에서 전체 작업이 1시간을 넘을 것으로 보이면 멈추고 예상 시간 보고(→ 사용자에게 사전 보고, "예, 이어서 진행" 승인받음, 2026-11-06).
+- 절차:
+  1. git pull → 완료(2026-11-06, 변경 없음)
+  2. docs/EXPERIMENTS.md에 EXP-012 실행 전 기록 → 이 커밋
+  3. Dockerfile libgomp 심볼릭 링크 → apt 정식 설치로 교체, 1단계 curl 3개 재확인
+  4. requirements.txt에 mlflow 추가, 설치 버전 기록, log_model 인자명 확인
+  5. docker-compose.yml에 mlflow 서비스 추가(포트 5000, SQLite+파일 저장 volume), api에 MLFLOW_TRACKING_URI·MODEL_URI 환경변수, .gitignore에 mlflow_data/·mlruns/·mlartifacts/ 추가
+  6. `v2/serving/pyfunc_model.py` 작성(NplPriceModel, load_context+predict, valuation_core.py 재사용)
+  7. `v2/serving/train_register.py` 작성(G2 학습, MLflow run 기록, code_paths와 함께 로그, npl-el-price 등록 + champion 별칭)
+  8. 재현 확인 A(MODEL_URI로 테스트 7,561건 재예측 MdAPE)
+  9. `model_loader.py` 수정(MODEL_URI 있으면 mlflow.pyfunc.load_model, 없으면 MODEL_DIR; /health에 모델명·버전·별칭·run_id·test_mdape)
+  10. `batch_score.py`에 `--model-uri` 옵션 추가(기본값 `models:/npl-el-price@champion`)
+  11. 재현 확인 B(sample_input.csv 3행, 1단계 vs 2단계 시세 차이)
+  12. pytest 재실행 + MLflow 경로 테스트 1개 추가
+  13. docker compose up -d --build(mlflow+api) → UI·curl 확인 → down
+  14. README.md에 2단계 실행 순서 추가
+  15. EXPERIMENTS.md 종료 기록, git status 확인 후 커밋·push
+- 결과: (실행 후 기록)
+- 주의:
+- 판정과 이유:
+- 변경 이력:
+- 다음:
 
 ---
 
