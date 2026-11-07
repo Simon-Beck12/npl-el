@@ -35,7 +35,7 @@
 | EXP-011 | v2 서빙 1단계 (FastAPI + Docker Compose) | 완료 | 완료 기준 충족 | 2026-11-06 | docker API 3개 응답, /recovery LGD 58.6010%(기대 58.6%) | 154221c |
 | EXP-012 | v2 서빙 2단계 (MLflow 추적·레지스트리) | 완료 | 완료 기준 충족 | 2026-11-06 | 재현 A 차이 0.00%p, 재현 B 차이 0, docker API npl-el-price v3 champion 응답 | 4be6ed2 |
 | EXP-013 | v2 서빙 3단계 (Airflow 일일 배치 재채점) | 완료 | 완료 기준 충족 | 2026-11-07 | DAG 4개 작업 success, 시세 재현 차이 0, MLflow npl-el-batch run(portfolio_lgd=0.578428) | 38c0afa |
-| EXP-014 | v2 서빙 성능 최적화 (k-NN 피처 벡터화) | 실행중 | - | 2026-11-07 14:08 | 배치 7,561건 190.12초→0.77초(246배), 동일성 확인 0건 불일치 | (다음 커밋에서 기록) |
+| EXP-014 | v2 서빙 성능 최적화 (k-NN 피처 벡터화) | 실행중 | - | 2026-11-07 14:08 | 배치 7,561건 190.12초→0.77초(246배), 동일성 확인 0건 불일치 | bc61c0a |
 
 ---
 
@@ -739,7 +739,7 @@
 
 ## EXP-014 | v2 서빙 성능 최적화 (k-NN 피처 벡터화)
 - 상태: 실행중(4~12단계 완료, 13~17단계 남음) | 판정: -
-- 시작: 2026-11-07 14:08 (추정 소요 3.6~4.5시간, 2회 분할 진행 — 사용자 승인) | 종료: - | 커밋(등록 시점): (다음 커밋에서 기록)
+- 시작: 2026-11-07 14:08 (추정 소요 3.6~4.5시간, 2회 분할 진행 — 사용자 승인) | 종료: - | 커밋(등록 시점): bc61c0a
 - 실행 명령: `OMP_NUM_THREADS=1 uv run python v2/serving/bench.py --path {old,new} --out results/bench_{before,after}.json`, `pytest v2/serving/tests` | 출력 폴더: `v2/serving/results/`
 - 배경: EXP-011~013으로 서빙 경로(API·배치·Airflow)가 갖춰졌으나, `valuation_core.predict_valuation`이 요청·행마다 `add_knn_ppm2`로 cKDTree를 새로 만든다(`v2/serving/valuation_core.py:52`, 기준 데이터 n_ref=45,634행). 배치 7,561건·반복 API 호출에서 병목으로 의심된다.
 - 목적: 서빙 경로의 k-NN 병목(요청·행마다 cKDTree 재생성)을 없애고, 결과가 완전히 같다는 것을 확인한 뒤 전후 성능을 숫자로 기록한다.
