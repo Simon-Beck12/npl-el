@@ -35,6 +35,7 @@
 | EXP-011 | v2 서빙 1단계 (FastAPI + Docker Compose) | 완료 | 완료 기준 충족 | 2026-11-06 | docker API 3개 응답, /recovery LGD 58.6010%(기대 58.6%) | 154221c |
 | EXP-012 | v2 서빙 2단계 (MLflow 추적·레지스트리) | 완료 | 완료 기준 충족 | 2026-11-06 | 재현 A 차이 0.00%p, 재현 B 차이 0, docker API npl-el-price v3 champion 응답 | 4be6ed2 |
 | EXP-013 | v2 서빙 3단계 (Airflow 일일 배치 재채점) | 완료 | 완료 기준 충족 | 2026-11-07 | DAG 4개 작업 success, 시세 재현 차이 0, MLflow npl-el-batch run(portfolio_lgd=0.578428) | 38c0afa |
+| EXP-014 | v2 서빙 성능 최적화 (k-NN 피처 벡터화) | 계획 | - | - | - | - |
 
 ---
 
@@ -733,6 +734,58 @@
   - `v2/serving/.env.example`(`AIRFLOW_UID=1000`) 추가, 실제 `.env`는 커밋 제외.
   - `v2/serving/airflow/{db,logs,output}/.gitkeep` 추가, `.gitignore`에 세 폴더 모두 "내용은 제외하되 .gitkeep은 추적" 패턴 적용.
 - 다음: 작업 함수(`score`/`log_to_mlflow`)에 Airflow 실행 정보 대신 필요한 값만 문자열 인자로 넘겨, `/opt/npl-venv`가 Airflow 전용 의존성(pendulum 등) 없이도 동작하도록 줄이는 방안을 검토한다(이번 실험에서는 구현하지 않음).
+
+---
+
+## EXP-014 | v2 서빙 성능 최적화 (k-NN 피처 벡터화)
+- 상태: 계획 | 판정: -
+- 시작: - | 종료: - | 커밋(등록 시점): (다음 커밋에서 기록)
+- 실행 명령: `v2/serving/bench.py`(전후 측정), `docker compose up -d --build`(mlflow+api+airflow) | 출력 폴더: `v2/serving/results/`
+- 배경: EXP-011~013으로 서빙 경로(API·배치·Airflow)가 갖춰졌으나, `valuation_core.predict_valuation`이 요청·행마다 `add_knn_ppm2`로 cKDTree를 새로 만든다(`v2/serving/valuation_core.py:52`, 기준 데이터 n_ref=45,634행). 배치 7,561건·반복 API 호출에서 병목으로 의심된다.
+- 목적: 서빙 경로의 k-NN 병목(요청·행마다 cKDTree 재생성)을 없애고, 결과가 완전히 같다는 것을 확인한 뒤 전후 성능을 숫자로 기록한다.
+- [하지 말 것] (그대로 옮김):
+  - `v2/price_model.py`, `v2/recovery.py`, `src/` 아래 파일을 수정하지 않는다.
+  - 모델을 다시 학습하지 않는다. `artifact/`의 model.txt, ref.parquet, meta.json을 그대로 쓴다.
+  - 테스트 기대값(MdAPE 11.5635%, 효창동 LGD 58.6010%)을 바꾸지 않는다.
+  - MLflow의 기존 버전(v1~v3)과 기록을 지우지 않는다.
+  - `mlflow_data/`, `artifact/`, `airflow/db·logs·output`, `data/`, 1MB 넘는 파일을 커밋하지 않는다.
+  - 컴퓨터 본체에 apt로 설치하지 않는다. sudo를 쓰지 않는다.
+  - 결과를 본 뒤 채택 기준이나 측정 조건을 바꾸지 않는다.
+  - 오류가 나거나 숫자가 기준을 벗어나면, 원인을 찾았더라도 고쳐서 다시 돌리기 전에 멈추고 보고한다.
+- 채택 기준(실행 전 고정, 1~3 중 하나라도 어기면 채택하지 않음, 4를 어기면 채택하지 않고 보고):
+  1. 테스트 7,561건에서 고친 경로와 기존 경로의 시세 차이가 모든 행에서 1e-6만 원 이하다.
+  2. knn_ppm2_5, same_bldg 값이 모든 행에서 같다.
+  3. 고친 경로의 테스트 MdAPE가 11.5635%(±0.0001%p)다.
+  4. API 단건 응답 시간 p50이 기존보다 줄었다.
+- 측정 조건(실행 전 고정, 4단계에서 실측값으로 채움): CPU 모델·코어 수·메모리, Python·LightGBM·SciPy 버전, LightGBM `num_threads=1`, 워밍업 50회, API 1,000회 호출(TestClient), 배치 7,561건 전체.
+- 멈춤 지점(사전 고정):
+  - 3단계 예상 시간이 1시간을 넘으면 멈춤.
+  - 10단계 동일성 확인(채택 기준 1~3)에서 한 행이라도 다르면 멈춤.
+  - 13단계 MLflow 새 버전의 MdAPE가 기준을 벗어나면 champion을 옮기지 말고 멈춤.
+  - 14단계 DAG 결과가 직전 정상 실행과 다르면 멈춤.
+- 절차:
+  1. git pull
+  2. docs/EXPERIMENTS.md에 EXP-014 실행 전 기록 → 이 커밋
+  3. 전체 작업 예상 시간 계산(1시간 넘으면 멈춤)
+  4. 측정 조건 실측 기록
+  5. `v2/serving/bench.py` 작성, 기존 경로 측정 → `results/bench_before.json`
+  6. `v2/serving/fast_features.py` 작성(KnnIndex 클래스, 벡터화 same_bldg/knn)
+  7. `valuation_core.py`에 다건 예측 함수 추가(기존 단건 함수 유지)
+  8. `pyfunc_model.py` load_context에서 KnnIndex 생성, predict를 다건 처리로 변경
+  9. `model_loader.py`·`app.py`·`batch_score.py`가 새 경로를 쓰도록 변경
+  10. 동일성 확인(7,561건, 채택 기준 1~3)
+  11. 같은 조건으로 새 경로 측정 → `results/bench_after.json`
+  12. pytest(새 테스트 2개 포함)
+  13. MLflow 새 버전 등록(재학습 없이), MdAPE 재확인 후 champion 이동
+  14. docker compose up(mlflow+api+airflow), /health·/recovery 확인, DAG 1회 실행 확인, down
+  15. `results/exp014_perf.md`에 전후 비교표 작성
+  16. README.md에 "성능" 절 추가
+  17. EXPERIMENTS.md 종료 기록, git status 확인 후 커밋·push
+- 결과:
+- 주의:
+- 판정과 이유:
+- 변경 이력:
+- 다음:
 
 ---
 
