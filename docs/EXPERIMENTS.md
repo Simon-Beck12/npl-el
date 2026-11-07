@@ -706,6 +706,12 @@
   13. EXPERIMENTS.md 종료 기록, git status 확인 후 커밋·push
 - 결과: (실행 후 기록)
 - 주의:
+  - DAG 실행 중 실패 후 소실된 run 3개와 원인(메타DB 비영속화로 docker compose up -d --build 재생성 때마다 삭제됨, 되돌릴 수 없음):
+    1. `manual__2026-11-06T15:24:31.209196+00:00` — DAG가 `is_paused=True`로 생성돼 unpause 전까지 약 8시간 25분 `queued`에서 멈춤(프리징). unpause 직후 2초 만에 `running`으로 전환.
+    2. `scheduled__2026-11-06T17:00:00+00:00`(1차, unpause 직후 자동 생성된 백필 실행) — `score` 작업에서 `ModuleNotFoundError: No module named 'pendulum'`(재시도 포함 2회 모두 실패). `/opt/npl-venv`가 `v2/serving/requirements.txt`(API용)만 설치해 Airflow 쪽에서만 쓰던 pendulum이 빠져 있었음.
+    3. `manual__2026-11-07T02:12:20.493094+00:00` — pendulum 수정(Dockerfile에 `pendulum==3.3.0`, `lazy_object_proxy==1.13.0` 추가, Airflow 이미지 실측 버전과 동일) 후 재트리거했으나 `score` 작업에서 `PermissionError: /opt/npl-el/output/rescore_2026-11-07.csv`(재시도 포함 2회 모두 실패). `airflow/output/` 호스트 디렉터리가 `root:root 755`로 생성돼 컨테이너의 `airflow`(uid 50000) 프로세스가 쓸 수 없었음.
+  - 소실 원인: Airflow 메타DB(SQLite)를 볼륨으로 연결하지 않아 컨테이너 안에만 있었고, `docker compose up -d --build`로 컨테이너를 재생성할 때마다 DB가 초기화됨(로그 파일도 동일하게 소실). AIRFLOW_UID 권한 수정을 반영하려고 재빌드한 시점(2026-11-07)에 위 3개 run 기록이 모두 사라졌다.
+  - 소실은 "재빌드 후 재기동" 지시(사용자 승인)의 부작용이며 의도적 삭제가 아니다. 위 3건의 원인 기록은 이 항목과 해당 시점의 대화 보고에 남겨두고, 이후 메타DB·로그를 볼륨으로 영속화해 재발을 막는다.
 - 판정과 이유:
 - 변경 이력:
 - 다음:
