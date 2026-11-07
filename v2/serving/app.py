@@ -34,9 +34,10 @@ class ValuationRequest(BaseModel):
     buildYear: int
     dealYear: int
     dealMonth: int = Field(ge=1, le=12)
-    gu_name: Optional[str] = None
-    umdNm: Optional[str] = None
-    jibun: Optional[str] = None
+    # EXP-013: same_bldg 계산에 주소가 꼭 필요해 필수 입력으로 바꾼다. 빈 문자열도 막는다.
+    gu_name: str = Field(min_length=1)
+    umdNm: str = Field(min_length=1)
+    jibun: str = Field(min_length=1)
 
 
 class ValuationResponse(BaseModel):

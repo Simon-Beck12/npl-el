@@ -34,7 +34,7 @@
 | EXP-010 | 일괄매각 의심 면적 필터 + v1·v2 LGD 재계산 | 완료 | 완료 기준 충족 | 2026-11-05 18:00 | v1 57.4%→79.0%(19건), v2 87.5%→87.5%(18건, 변화 없음) | 25ff949 |
 | EXP-011 | v2 서빙 1단계 (FastAPI + Docker Compose) | 완료 | 완료 기준 충족 | 2026-11-06 | docker API 3개 응답, /recovery LGD 58.6010%(기대 58.6%) | 154221c |
 | EXP-012 | v2 서빙 2단계 (MLflow 추적·레지스트리) | 완료 | 완료 기준 충족 | 2026-11-06 | 재현 A 차이 0.00%p, 재현 B 차이 0, docker API npl-el-price v3 champion 응답 | 4be6ed2 |
-| EXP-013 | v2 서빙 3단계 (Airflow 일일 배치 재채점) | 진행 중 | - | 2026-11-07 (기록 예정) | - | (다음 커밋에서 기록) |
+| EXP-013 | v2 서빙 3단계 (Airflow 일일 배치 재채점) | 완료 | 완료 기준 충족 | 2026-11-07 | DAG 4개 작업 success, 시세 재현 차이 0, MLflow npl-el-batch run(portfolio_lgd=0.578428) | (다음 커밋에서 기록) |
 
 ---
 
@@ -669,8 +669,8 @@
 ---
 
 ## EXP-013 | v2 서빙 3단계 (Airflow 일일 배치 재채점)
-- 상태: 진행 중 | 판정: -
-- 시작: 2026-11-07 (추정 소요 1~2시간) | 종료: - | 커밋(등록 시점): (다음 커밋에서 기록)
+- 상태: 완료 | 판정: 완료 기준 충족
+- 시작: 2026-11-07 (추정 소요 1~2시간) | 종료: 2026-11-07 | 커밋(등록 시점): (다음 커밋에서 기록)
 - 실행 명령: `docker compose up`(mlflow+api+airflow), DAG `npl_el_daily_rescore` | 출력 폴더: `v2/serving/airflow/`
 - 배경: EXP-012(MLflow 레지스트리, champion 별칭)의 champion 모델을 매일 자동으로 배치 채점하고 실행 기록을 남긴다.
 - 목적: Airflow DAG로 champion 모델의 배치 채점을 매일 자동 실행하고, 실행 기록을 MLflow에 남긴다. 함께 `/valuation` 주소 입력을 필수로 바꾼다.
@@ -704,17 +704,35 @@
   11. docker compose down
   12. README.md에 3단계 추가(DAG 구조, 수동 실행, 결과 위치, 모델 교체 절차)
   13. EXPERIMENTS.md 종료 기록, git status 확인 후 커밋·push
-- 결과: (실행 후 기록)
+- 결과:
+
+  | 확인 항목 | 결과 | 파일 |
+  |---|---|---|
+  | pytest(`v2/serving/tests`) | 10 passed, 1 skipped(MLflow 경로 테스트, MLFLOW_TRACKING_URI 미연결 시 skip) | `v2/serving/tests/test_api.py` |
+  | 주소 없는 /valuation(필드 없음/빈 문자열 2건) | 422 | 위 동일 |
+  | DAG 1회 실행 작업 4개(run_id `scheduled__2026-11-06T17:00:00+00:00`) | check_input·score·validate_output·log_to_mlflow 전부 success | `v2/serving/airflow/db/airflow.db` |
+  | DAG 출력 vs `batch_score.py` 직접 실행 시세 차이 | 0.0(3행 모두) | `v2/serving/airflow/output/rescore_2026-11-07.csv` |
+  | MLflow `npl-el-batch` run | model_version=3, n_rows=3, n_error=0, avg_lgd=0.488333, portfolio_lgd=0.578428 | `http://localhost:5000` 실험 `npl-el-batch` |
+  | 필수 컬럼(jibun) 누락 입력 실행(run_id `manual__2026-11-07T02:38:13`) | check_input 실패(재시도 포함 2회), 나머지 3개는 upstream_failed | `v2/serving/airflow/logs/dag_id=npl_el_daily_rescore/run_id=manual__2026-11-07T02:38:13.715849+00:00/` |
+  | DB·로그 영속화(강제 재생성 2회) | 성공 run 1개·실패 run 1개 모두 재생성 후에도 유지 | `v2/serving/airflow/db/airflow.db`, `v2/serving/airflow/logs/` |
+
+  - 지표 설명: DAG 작업 상태는 `airflow tasks states-for-dag-run`, 시세 차이는 두 CSV의 `시세` 컬럼 값을 행별로 직접 비교(허용 오차 0), MLflow 지표는 REST API(`/api/2.0/mlflow/runs/search`)로 조회.
 - 주의:
   - DAG 실행 중 실패 후 소실된 run 3개와 원인(메타DB 비영속화로 docker compose up -d --build 재생성 때마다 삭제됨, 되돌릴 수 없음):
     1. `manual__2026-11-06T15:24:31.209196+00:00` — DAG가 `is_paused=True`로 생성돼 unpause 전까지 약 8시간 25분 `queued`에서 멈춤(프리징). unpause 직후 2초 만에 `running`으로 전환.
     2. `scheduled__2026-11-06T17:00:00+00:00`(1차, unpause 직후 자동 생성된 백필 실행) — `score` 작업에서 `ModuleNotFoundError: No module named 'pendulum'`(재시도 포함 2회 모두 실패). `/opt/npl-venv`가 `v2/serving/requirements.txt`(API용)만 설치해 Airflow 쪽에서만 쓰던 pendulum이 빠져 있었음.
     3. `manual__2026-11-07T02:12:20.493094+00:00` — pendulum 수정(Dockerfile에 `pendulum==3.3.0`, `lazy_object_proxy==1.13.0` 추가, Airflow 이미지 실측 버전과 동일) 후 재트리거했으나 `score` 작업에서 `PermissionError: /opt/npl-el/output/rescore_2026-11-07.csv`(재시도 포함 2회 모두 실패). `airflow/output/` 호스트 디렉터리가 `root:root 755`로 생성돼 컨테이너의 `airflow`(uid 50000) 프로세스가 쓸 수 없었음.
   - 소실 원인: Airflow 메타DB(SQLite)를 볼륨으로 연결하지 않아 컨테이너 안에만 있었고, `docker compose up -d --build`로 컨테이너를 재생성할 때마다 DB가 초기화됨(로그 파일도 동일하게 소실). AIRFLOW_UID 권한 수정을 반영하려고 재빌드한 시점(2026-11-07)에 위 3개 run 기록이 모두 사라졌다.
-  - 소실은 "재빌드 후 재기동" 지시(사용자 승인)의 부작용이며 의도적 삭제가 아니다. 위 3건의 원인 기록은 이 항목과 해당 시점의 대화 보고에 남겨두고, 이후 메타DB·로그를 볼륨으로 영속화해 재발을 막는다.
-- 판정과 이유:
-- 변경 이력:
-- 다음:
+  - 소실은 "재빌드 후 재기동" 지시(사용자 승인)의 부작용이며 의도적 삭제가 아니다. 위 3건의 원인 기록은 이 항목과 해당 시점의 대화 보고에 남겨두고, 이후 메타DB·로그를 볼륨으로 영속화해 재발을 막았다(아래 결과·변경 이력 참고). 영속화 적용 후에는 강제 재생성(`docker compose up -d --force-recreate airflow`) 2회에서 모두 run 기록·로그가 유지되는 것을 확인했다.
+  - MLflow `npl-el-batch` run은 Airflow 메타DB와 달리 처음부터(EXP-012 때 설정한) 볼륨(`./mlflow_data`)에 있어 Airflow 쪽 소실과 무관하게 전부 남아 있다(검증 과정에서 생긴 run 2개 포함, 둘 다 같은 model_version=3·n_rows=3·portfolio_lgd=0.578428로 일치).
+- 판정과 이유: 완료 기준 충족. `/valuation`·배치 모두 주소 필수화 확인, DAG 1회 실행에서 작업 4개 전부 성공, 시세 재현 차이 0, MLflow npl-el-batch에 모델 버전 포함 run 기록, 필수 컬럼 누락 입력에서 check_input 실패까지 모두 확인했다. 다만 검증 과정에서 메타DB 비영속 문제로 run 3개가 소실되는 사건이 있었고(위 주의 참고), 이를 고친 뒤 영속화가 유지되는 것까지 재확인한 뒤에야 기준을 만족시켰다.
+- 변경 이력(지시 범위 밖, 모두 사용자 승인):
+  - DAG(`npl_el_daily_rescore.py`)에 `is_paused_upon_creation=False` 추가(기본값이면 수동 트리거도 unpause 전까지 queued에서 멈춤).
+  - `v2/serving/airflow/Dockerfile`에 `pendulum==3.3.0`, `lazy_object_proxy==1.13.0` 설치 추가(Airflow 이미지 실측 버전과 동일하게 맞춤) — `score`/`log_to_mlflow`가 `/opt/npl-venv`(외부 가상환경)에서 Airflow 쪽 모듈(pendulum)을 직접 import해 발생한 오류 해결.
+  - `docker-compose.yml` airflow 서비스에 `user: "${AIRFLOW_UID:-50000}:0"`, DB·로그 볼륨(`./airflow/db:/opt/airflow/db`, `./airflow/logs:/opt/airflow/logs`), `AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=sqlite:////opt/airflow/db/airflow.db` 추가 — output 폴더 권한 오류 해결 + 메타DB·로그 영속화.
+  - `v2/serving/.env.example`(`AIRFLOW_UID=1000`) 추가, 실제 `.env`는 커밋 제외.
+  - `v2/serving/airflow/{db,logs,output}/.gitkeep` 추가, `.gitignore`에 세 폴더 모두 "내용은 제외하되 .gitkeep은 추적" 패턴 적용.
+- 다음: 작업 함수(`score`/`log_to_mlflow`)에 Airflow 실행 정보 대신 필요한 값만 문자열 인자로 넘겨, `/opt/npl-venv`가 Airflow 전용 의존성(pendulum 등) 없이도 동작하도록 줄이는 방안을 검토한다(이번 실험에서는 구현하지 않음).
 
 ---
 

@@ -29,3 +29,26 @@ services:
       - ./artifact:/app/artifact:ro
     depends_on:
       - mlflow
+
+  airflow:
+    build:
+      context: ../..
+      dockerfile: v2/serving/airflow/Dockerfile
+    command: standalone
+    user: "${AIRFLOW_UID:-50000}:0"
+    ports:
+      - "8080:8080"
+    environment:
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - MODEL_URI=models:/npl-el-price@champion
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=sqlite:////opt/airflow/db/airflow.db
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags:ro
+      - ./airflow/output:/opt/npl-el/output
+      - ./airflow/db:/opt/airflow/db
+      - ./airflow/logs:/opt/airflow/logs
+      - ../../src:/opt/npl-el/src:ro
+      - ..:/opt/npl-el/v2:ro
+    depends_on:
+      - mlflow

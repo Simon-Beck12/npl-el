@@ -1,8 +1,10 @@
-"""EXP-011 8단계: 물건 목록 CSV를 한 번에 시세·회수액으로 계산하는 배치 스크립트.
+"""EXP-011 8단계(EXP-013 수정: 구·umdNm·jibun 필수화): 물건 목록 CSV를 한 번에
+시세·회수액으로 계산하는 배치 스크립트.
 
 입력 CSV 컬럼: lat, lng, excluUseAr, floor, buildYear, dealYear, dealMonth,
-(선택) 구, umdNm, jibun, deposit, ead, months, rho_scenario(비관/기본/낙관)
-출력 CSV 컬럼: 입력 전체 + 시세, S, R, PV, LGD
+구, umdNm, jibun(필수 — EXP-013, same_bldg 계산에 필요), deposit, ead, months,
+rho_scenario(비관/기본/낙관)
+출력 CSV 컬럼: 입력 전체 + 시세, S, R, PV, LGD, 오류(비어 있으면 정상)
 """
 import argparse
 import sys
@@ -18,24 +20,36 @@ from recovery import compute_recovery_v2  # noqa: E402
 from valuation_core import build_target_row, predict_valuation  # noqa: E402
 
 DEFAULT_INPUT = Path(__file__).resolve().parent / "examples" / "sample_input.csv"
+REQUIRED_ADDRESS_COLS = ["구", "umdNm", "jibun"]
+EMPTY_RESULT = {"시세": None, "S": None, "R": None, "PV": None, "LGD": None}
+
+
+def _missing_address(row):
+    missing = [c for c in REQUIRED_ADDRESS_COLS
+               if c not in row or pd.isna(row.get(c)) or str(row.get(c)).strip() == ""]
+    return missing
 
 
 def score_row(row, ref, booster):
-    gu_name = row.get("구") if pd.notna(row.get("구")) else None
-    umdNm = row.get("umdNm") if pd.notna(row.get("umdNm")) else None
-    jibun = row.get("jibun") if pd.notna(row.get("jibun")) else None
+    missing = _missing_address(row)
+    if missing:
+        return pd.Series({**EMPTY_RESULT, "오류": f"필수 주소 컬럼 없음/빈값: {','.join(missing)}"})
     target = build_target_row(
         lat=row["lat"], lng=row["lng"], excluUseAr=row["excluUseAr"], floor=row["floor"],
         buildYear=row["buildYear"], dealYear=row["dealYear"], dealMonth=row["dealMonth"],
-        gu_name=gu_name, umdNm=umdNm, jibun=jibun,
+        gu_name=row["구"], umdNm=row["umdNm"], jibun=row["jibun"],
     )
-    val = predict_valuation(target, ref, booster)
-    rho = RHO_SCENARIOS[row["rho_scenario"]]
-    rec = compute_recovery_v2(
-        market_price=val["market_price"], rho=rho,
-        deposit=row["deposit"], ead=row["ead"], months=row["months"],
-    )
-    return pd.Series({"시세": val["market_price"], "S": rec["S"], "R": rec["R"], "PV": rec["PV"], "LGD": rec["LGD"]})
+    try:
+        val = predict_valuation(target, ref, booster)
+        rho = RHO_SCENARIOS[row["rho_scenario"]]
+        rec = compute_recovery_v2(
+            market_price=val["market_price"], rho=rho,
+            deposit=row["deposit"], ead=row["ead"], months=row["months"],
+        )
+    except Exception as exc:
+        return pd.Series({**EMPTY_RESULT, "오류": f"계산 실패: {exc}"})
+    return pd.Series({"시세": val["market_price"], "S": rec["S"], "R": rec["R"], "PV": rec["PV"],
+                       "LGD": rec["LGD"], "오류": ""})
 
 
 DEFAULT_MODEL_URI = "models:/npl-el-price@champion"
@@ -58,7 +72,9 @@ def main():
     scored = df.apply(lambda row: score_row(row, ref, booster), axis=1)
     out = pd.concat([df, scored], axis=1)
     out.to_csv(output_path, index=False)
-    print(f"{len(out)}건 계산, 저장: {output_path}")
+    n_error = int((out["오류"] != "").sum())
+    print(f"{len(out)}건 계산(오류 {n_error}건), 저장: {output_path}")
+    return out, n_error
 
 
 if __name__ == "__main__":

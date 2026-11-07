@@ -29,6 +29,13 @@
 **/mlruns/
 **/mlartifacts/
 mlflow.db
+**/airflow/logs/*
+!**/airflow/logs/.gitkeep
+**/airflow/output/*
+!**/airflow/output/.gitkeep
+**/airflow/db/*
+!**/airflow/db/.gitkeep
+airflow.db
 .env
 *.zip
 *.tar

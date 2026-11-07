@@ -70,11 +70,25 @@ def test_valuation_ok():
     r = client.post("/valuation", json={
         "lat": 37.6036, "lng": 126.9589, "excluUseAr": 36.5, "floor": 3,
         "buildYear": 2005, "dealYear": 2026, "dealMonth": 7,
+        "gu_name": "종로구", "umdNm": "신영동", "jibun": "213-1",
     })
     assert r.status_code == 200
     body = r.json()
     assert body["market_price"] > 0
     assert body["same_bldg"] in (0, 1)
+
+
+@pytest.mark.parametrize("payload", [
+    {"lat": 37.6036, "lng": 126.9589, "excluUseAr": 36.5, "floor": 3,
+     "buildYear": 2005, "dealYear": 2026, "dealMonth": 7},  # 구·umdNm·jibun 아예 없음
+    {"lat": 37.6036, "lng": 126.9589, "excluUseAr": 36.5, "floor": 3,
+     "buildYear": 2005, "dealYear": 2026, "dealMonth": 7,
+     "gu_name": "", "umdNm": "신영동", "jibun": "213-1"},  # 빈 문자열
+])
+def test_valuation_missing_address_422(payload):
+    """EXP-013 4단계: 주소(구·umdNm·jibun) 없는 /valuation 요청은 422다."""
+    r = client.post("/valuation", json=payload)
+    assert r.status_code == 422
 
 
 def test_model_loader_mlflow_path():
