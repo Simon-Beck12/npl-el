@@ -15,8 +15,8 @@ sys.path.insert(0, str(ROOT / "v2"))
 
 from recovery import compute_recovery_v2  # noqa: E402
 
-from model_loader import load_model  # noqa: E402
-from valuation_core import build_target_row, predict_valuation  # noqa: E402
+from model_loader import load_model, KnnIndex  # noqa: E402
+from valuation_core import build_target_row, predict_valuation_batch  # noqa: E402
 
 app = FastAPI(title="npl-el v2 serving", version="1")
 
@@ -24,6 +24,8 @@ app = FastAPI(title="npl-el v2 serving", version="1")
 RHO_SCENARIOS = {"비관": 0.5738, "기본": 0.644620, "낙관": 0.8002}
 
 _booster, _ref, _meta = load_model()
+# EXP-014 9단계: cKDTree·건물별 개수를 ref로 1번만 만든다(요청마다 새로 만들지 않는다).
+_knn_index = KnnIndex(_ref)
 
 
 class ValuationRequest(BaseModel):
@@ -98,7 +100,13 @@ def valuation(req: ValuationRequest):
         buildYear=req.buildYear, dealYear=req.dealYear, dealMonth=req.dealMonth,
         gu_name=req.gu_name, umdNm=req.umdNm, jibun=req.jibun,
     )
-    result = predict_valuation(target, _ref, _booster)
+    result_df = predict_valuation_batch(target, _knn_index, _booster)
+    result = {
+        "market_price": float(result_df["market_price"].iloc[0]),
+        "price_per_m2": float(result_df["price_per_m2"].iloc[0]),
+        "knn_ppm2_5": float(result_df["knn_ppm2_5"].iloc[0]),
+        "same_bldg": int(result_df["same_bldg"].iloc[0]),
+    }
     return ValuationResponse(**result, model_version=app.version)
 
 

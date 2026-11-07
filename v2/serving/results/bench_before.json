@@ -1,0 +1,31 @@
+{
+  "path": "old",
+  "api": {
+    "p50_ms": 5.923274999076966,
+    "p95_ms": 6.942343648188397,
+    "mean_ms": 6.0242822599975625
+  },
+  "batch_valuation": {
+    "n_rows": 7561,
+    "elapsed_sec": 190.12060753699916,
+    "rows_per_sec": 39.769492102683095
+  },
+  "test_mdape": 11.56350202467546,
+  "memory_rss_mb": {
+    "after_import": 99.046875,
+    "after_model_load": 244.59765625
+  },
+  "conditions": {
+    "cpu_model": "AMD Ryzen 9 5950X 16-Core Processor",
+    "cpu_count_logical": 32,
+    "mem_total_gb": 125.7,
+    "python_version": "3.12.3",
+    "lightgbm_version": "4.7.0",
+    "scipy_version": "1.18.1",
+    "lightgbm_num_threads_env": "1",
+    "api_warmup": 50,
+    "api_n_calls": 1000,
+    "batch_n_rows": 7561,
+    "path": "old"
+  }
+}

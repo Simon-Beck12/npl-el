@@ -12,6 +12,10 @@ from pathlib import Path
 import lightgbm as lgb
 import pandas as pd
 
+# EXP-014 9단계: app.py·batch_score.py가 model_loader를 통해서만 KnnIndex를 쓰도록
+# 여기서 다시 내보낸다(ref로 cKDTree·건물별 개수를 1번만 만들어 재사용하는 경로).
+from fast_features import KnnIndex  # noqa: F401
+
 DEFAULT_MODEL_DIR = Path(__file__).resolve().parent / "artifact"
 
 

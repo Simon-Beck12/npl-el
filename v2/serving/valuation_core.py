@@ -65,3 +65,48 @@ def predict_valuation(target, ref, booster):
         "knn_ppm2_5": float(target["knn_ppm2_5"].iloc[0]),
         "same_bldg": int(target["same_bldg"].iloc[0]),
     }
+
+
+def build_target_frame(lat, lng, excluUseAr, floor, buildYear, dealYear, dealMonth,
+                        gu_name=None, umdNm=None, jibun=None):
+    """EXP-014 7단계: build_target_row()의 여러 행 버전. lat 등 인자는 모두 같은 길이의
+    Series(또는 배열)다. gu_name/umdNm/jibun이 없으면(None) same_bldg=0으로 둔다(단건과 동일)."""
+    lat = np.asarray(lat, dtype=float)
+    lng = np.asarray(lng, dtype=float)
+    buildYear = np.asarray(buildYear, dtype=int)
+    dealYear = np.asarray(dealYear, dtype=int)
+    dealMonth = np.asarray(dealMonth, dtype=int)
+    n = len(lat)
+    loc_x_km, loc_y_km = _loc_km(lat, lng)
+    return pd.DataFrame({
+        "lat": lat, "lng": lng, "excluUseAr": np.asarray(excluUseAr, dtype=float),
+        "age_years": dealYear - buildYear, "floor_feat": np.asarray(floor, dtype=float),
+        "month_idx": _month_idx(dealYear, dealMonth),
+        "loc_x_km": loc_x_km, "loc_y_km": loc_y_km,
+        "gu_name": gu_name, "umdNm": umdNm, "jibun": jibun,
+        "deal_id": ["__query__"] * n,
+    })
+
+
+def predict_valuation_batch(targets, knn_index, booster):
+    """EXP-014 7단계: predict_valuation()의 여러 행 버전. targets: build_target_row() 또는
+    build_target_frame()이 만든, 같은 컬럼을 가진 1행 이상 DataFrame. knn_index: fast_features.KnnIndex(ref)를
+    1번만 만들어 재사용한다(행마다 cKDTree를 새로 만들지 않는다). booster.predict()도 1번만 호출한다.
+    같은 입력이면 predict_valuation(target, ref, booster)과 행별로 같은 값을 반환한다."""
+    targets = targets.reset_index(drop=True)
+    knn_ppm2_5 = knn_index.knn_ppm2(targets)
+    has_address = targets[["gu_name", "umdNm", "jibun"]].notna().all(axis=1)
+    same_bldg = np.zeros(len(targets), dtype=int)
+    if has_address.any():
+        same_bldg[has_address.to_numpy()] = knn_index.same_bldg(targets.loc[has_address])
+    targets = targets.assign(knn_ppm2_5=knn_ppm2_5, same_bldg=same_bldg)
+
+    pred_log = booster.predict(targets[FULL8])
+    price_per_m2 = np.exp(pred_log)
+    market_price = price_per_m2 * targets["excluUseAr"].to_numpy()
+    return pd.DataFrame({
+        "market_price": market_price,
+        "price_per_m2": price_per_m2,
+        "knn_ppm2_5": knn_ppm2_5,
+        "same_bldg": same_bldg,
+    })

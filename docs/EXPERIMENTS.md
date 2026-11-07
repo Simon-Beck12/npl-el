@@ -35,7 +35,7 @@
 | EXP-011 | v2 서빙 1단계 (FastAPI + Docker Compose) | 완료 | 완료 기준 충족 | 2026-11-06 | docker API 3개 응답, /recovery LGD 58.6010%(기대 58.6%) | 154221c |
 | EXP-012 | v2 서빙 2단계 (MLflow 추적·레지스트리) | 완료 | 완료 기준 충족 | 2026-11-06 | 재현 A 차이 0.00%p, 재현 B 차이 0, docker API npl-el-price v3 champion 응답 | 4be6ed2 |
 | EXP-013 | v2 서빙 3단계 (Airflow 일일 배치 재채점) | 완료 | 완료 기준 충족 | 2026-11-07 | DAG 4개 작업 success, 시세 재현 차이 0, MLflow npl-el-batch run(portfolio_lgd=0.578428) | 38c0afa |
-| EXP-014 | v2 서빙 성능 최적화 (k-NN 피처 벡터화) | 계획 | - | - | - | - |
+| EXP-014 | v2 서빙 성능 최적화 (k-NN 피처 벡터화) | 실행중 | - | 2026-11-07 14:08 | 배치 7,561건 190.12초→0.77초(246배), 동일성 확인 0건 불일치 | (다음 커밋에서 기록) |
 
 ---
 
@@ -738,9 +738,9 @@
 ---
 
 ## EXP-014 | v2 서빙 성능 최적화 (k-NN 피처 벡터화)
-- 상태: 계획 | 판정: -
-- 시작: - | 종료: - | 커밋(등록 시점): (다음 커밋에서 기록)
-- 실행 명령: `v2/serving/bench.py`(전후 측정), `docker compose up -d --build`(mlflow+api+airflow) | 출력 폴더: `v2/serving/results/`
+- 상태: 실행중(4~12단계 완료, 13~17단계 남음) | 판정: -
+- 시작: 2026-11-07 14:08 (추정 소요 3.6~4.5시간, 2회 분할 진행 — 사용자 승인) | 종료: - | 커밋(등록 시점): (다음 커밋에서 기록)
+- 실행 명령: `OMP_NUM_THREADS=1 uv run python v2/serving/bench.py --path {old,new} --out results/bench_{before,after}.json`, `pytest v2/serving/tests` | 출력 폴더: `v2/serving/results/`
 - 배경: EXP-011~013으로 서빙 경로(API·배치·Airflow)가 갖춰졌으나, `valuation_core.predict_valuation`이 요청·행마다 `add_knn_ppm2`로 cKDTree를 새로 만든다(`v2/serving/valuation_core.py:52`, 기준 데이터 n_ref=45,634행). 배치 7,561건·반복 API 호출에서 병목으로 의심된다.
 - 목적: 서빙 경로의 k-NN 병목(요청·행마다 cKDTree 재생성)을 없애고, 결과가 완전히 같다는 것을 확인한 뒤 전후 성능을 숫자로 기록한다.
 - [하지 말 것] (그대로 옮김):
@@ -781,11 +781,30 @@
   15. `results/exp014_perf.md`에 전후 비교표 작성
   16. README.md에 "성능" 절 추가
   17. EXPERIMENTS.md 종료 기록, git status 확인 후 커밋·push
-- 결과:
+- 결과(4~12단계, 13~17단계는 다음 커밋에서 이어 기록):
+
+  | 채택 기준 | 결과 | 통과 |
+  |---|---|---|
+  | 1. 시세 차이 ≤1e-6만원(7,561건) | 최대 차이 0.0 | 통과 |
+  | 2. knn_ppm2_5·same_bldg 전행 일치 | 불일치 0건 | 통과 |
+  | 3. 새 경로 테스트 MdAPE 11.5635%(±0.0001%p) | 11.56350202467546% (구 경로와 동일값) | 통과 |
+  | 4. API 단건 p50 감소 | 5.923ms → 5.719ms(−3.4%) | 통과 |
+
+  | 측정 항목 | 기존 경로(bench_before.json) | 새 경로(bench_after.json) | 배수 |
+  |---|---|---|---|
+  | API p50 / p95 / 평균 | 5.923 / 6.942 / 6.024 ms | 5.719 / 6.443 / 5.751 ms | 1.04x |
+  | 배치 시세 추정(7,561건) | 190.121초(39.8행/초) | 0.773초(9,782.9행/초) | 246.0x |
+  | 모델 로드 직후 RSS | 244.60 MB | 244.46 MB | - |
+  | pytest(`v2/serving/tests`) | - | 12 passed, 1 skipped(기존과 동일 사유로 skip) | - |
+
+  - 지표 설명: 시세·knn_ppm2_5·same_bldg 차이는 두 parquet(로컬 전용, 커밋 안 함)을 deal_id 기준으로 행별 직접 비교. API는 TestClient 1,000회(워밍업 50회 제외) p50·p95·평균. 배치는 테스트 7,561건 "시세 추정" 단계(cKDTree 병목 지점)만 측정, 회수액 계산은 제외(두 경로 동일). 측정 조건: AMD Ryzen 9 5950X(32스레드)/125.7GB, Python 3.12.3, LightGBM 4.7.0, SciPy 1.18.1, OMP_NUM_THREADS=1.
+  - 결과 파일: `v2/serving/results/bench_before.json`, `v2/serving/results/bench_after.json`
 - 주의:
-- 판정과 이유:
-- 변경 이력:
-- 다음:
+  - API p50 개선은 배치 대비 작다(1.04배) — 단건 호출은 원래도 cKDTree 1회 생성 비용(ref 45,634행 기준 수 ms)이 전체 응답 시간에서 차지하는 비중이 작았기 때문으로 추정(LightGBM 2554트리 predict 등 다른 고정 비용이 더 큼). 채택 기준 4(p50 감소)는 통과했다.
+  - model_loader.py는 함수 변경 없이 `fast_features.KnnIndex`를 재노출(re-export)만 한다(app.py·batch_score.py가 한 곳에서 가져오게 함) — 9단계 지시 범위 안의 설계 선택.
+- 판정과 이유: (13~17단계 완료 후 기록)
+- 변경 이력: (13~17단계 완료 후 기록 — 이번 라운드 변경은 모두 지시 범위 안)
+- 다음: 13단계(MLflow 새 버전 등록, champion 이동)부터 이어서 진행(사용자 승인 대기).
 
 ---
 
