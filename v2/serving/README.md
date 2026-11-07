@@ -138,6 +138,29 @@ rho 시나리오 값(EXP-010, 일괄매각 의심 제외 후): 비관 0.5738 / �
 | (EXP-013) DAG 출력 vs batch_score.py 직접 실행 시세 차이 | 0.0(3행 모두) |
 | (EXP-013) MLflow npl-el-batch run | model_version=3, n_rows=3, n_error=0, portfolio_lgd=0.578428 |
 | (EXP-013) 필수 컬럼 누락 입력 DAG 실행 | check_input 실패(재시도 포함), 나머지 작업은 upstream_failed |
+| (EXP-014) 시세·knn_ppm2_5·same_bldg 동일성(7,561건, 기존 경로 vs 새 경로) | 불일치 0건 |
+| (EXP-014) MLflow v4(재학습 없음, fast_features 코드만 변경) 재예측 MdAPE | 11.563502%(기준 11.5635%, 차이 0.000002%p) |
+| (EXP-014) docker compose up -d --build → /health·/recovery(효창동 LGD 58.6010%)·/valuation | 모두 200 |
+| (EXP-014) DAG 1회 실행(fast_features 적용 후) 작업 4개 | 전부 success, 출력 CSV가 직전 실행과 차이 0 |
+
+## 성능 (EXP-014)
+
+서빙 경로는 요청·행마다 `cKDTree`(기준 데이터 45,634행)를 새로 만들고 `same_bldg` 건수도
+매번 다시 세고 있었다 — API 단건·배치 모두에서 이 재생성 비용이 지배적이었다.
+`fast_features.KnnIndex`가 모델 로드 시점에 트리와 건물별 개수를 1번만 만들어 재사용하도록
+바꿨다(계산 로직은 `v2/price_model.py`의 `add_knn_ppm2`/`add_same_bldg`와 동일, 결과값도
+7,561건 전부 일치 확인).
+
+| 측정 항목 | 기존 | 새 | 배수 |
+|---|---|---|---|
+| API 단건 p50(TestClient 1,000회) | 30.337 ms | 5.697 ms | 5.32배(−81.2%) |
+| 배치 7,561건 시세 추정 | 190.121 초 | 0.773 초 | 246.0배 |
+
+측정 방법·구간별 분해(k-NN·same_bldg·LightGBM 예측 등)·CPU/스레드 조건은
+[`results/exp014_perf.md`](results/exp014_perf.md) 참고.
+
+모델 교체(새 버전에 문제가 있을 때 되돌리기)는 위 "별칭으로 모델 교체하기" 참고 —
+`champion` 별칭을 이전 버전(v1~v3) 번호로 다시 옮기면 된다. 재학습은 필요 없다.
 
 ## 알아둘 점
 
@@ -147,4 +170,4 @@ rho 시나리오 값(EXP-010, 일괄매각 의심 제외 후): 비관 0.5738 / �
 - MLflow 모델은 `mlflow.models.set_model`("models from code") 방식으로 로그한다 — cloudpickle로 객체를 직렬화하는 기본 방식은 서빙 컨테이너의 패키지 구성이 학습 때와 조금만 달라도 깨지기 쉬워, 이 파일(`pyfunc_model.py`)을 서빙 환경에서 다시 실행하는 방식으로 바꿨다.
 - MLflow 서버(3.x)는 Host 헤더 기반 DNS 리바인딩 방어가 기본 켜져 있다. docker-compose 네트워크 안에서 서비스명으로 접근하는 것과 호스트에서 `localhost`로 접근하는 것을 모두 허용하려면 `--allowed-hosts`에 포트까지 포함한 값(`mlflow:5000`, `localhost:5000` 등)을 넣어야 한다(`docker-compose.yml` 참고).
 - 지오코딩은 이번 범위 밖이다 — `/valuation`은 호출자가 직접 lat/lng을 줘야 한다.
-- `pyfunc_model.py`의 `NplPriceModel.predict`는 행 단위로 처리해 7,561건 같은 대량 배치에는 느리다(재현 확인 A에 몇 분 걸림). 배치 스코어링(`batch_score.py`)은 수십~수백 행 단위라 문제가 되지 않는다.
+- (EXP-014로 해결됨) `pyfunc_model.py`의 `NplPriceModel.predict`는 한때 행 단위로 처리해 7,561건 같은 대량 배치에 몇 분이 걸렸다. `fast_features.KnnIndex`로 cKDTree·same_bldg 집계를 1번만 만들고 `predict_valuation_batch`로 한 번에 처리하도록 바꿔 0.8초로 줄었다. 자세한 내용은 아래 "성능" 절 참고.

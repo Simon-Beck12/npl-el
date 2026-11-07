@@ -35,7 +35,7 @@
 | EXP-011 | v2 서빙 1단계 (FastAPI + Docker Compose) | 완료 | 완료 기준 충족 | 2026-11-06 | docker API 3개 응답, /recovery LGD 58.6010%(기대 58.6%) | 154221c |
 | EXP-012 | v2 서빙 2단계 (MLflow 추적·레지스트리) | 완료 | 완료 기준 충족 | 2026-11-06 | 재현 A 차이 0.00%p, 재현 B 차이 0, docker API npl-el-price v3 champion 응답 | 4be6ed2 |
 | EXP-013 | v2 서빙 3단계 (Airflow 일일 배치 재채점) | 완료 | 완료 기준 충족 | 2026-11-07 | DAG 4개 작업 success, 시세 재현 차이 0, MLflow npl-el-batch run(portfolio_lgd=0.578428) | 38c0afa |
-| EXP-014 | v2 서빙 성능 최적화 (k-NN 피처 벡터화) | 실행중 | - | 2026-11-07 14:08 | 배치 7,561건 190.12초→0.77초(246배), 동일성 확인 0건 불일치 | bc61c0a |
+| EXP-014 | v2 서빙 성능 최적화 (k-NN 피처 벡터화) | 완료 | 완료 기준 충족 | 2026-11-07 | API p50 30.337→5.697ms(5.32배), 배치 190.12초→0.77초(246배), MLflow v4 champion 이동, DAG 재현 확인 | bc61c0a |
 
 ---
 
@@ -738,8 +738,8 @@
 ---
 
 ## EXP-014 | v2 서빙 성능 최적화 (k-NN 피처 벡터화)
-- 상태: 실행중(4~12단계 완료, 13~17단계 남음) | 판정: -
-- 시작: 2026-11-07 14:08 (추정 소요 3.6~4.5시간, 2회 분할 진행 — 사용자 승인) | 종료: - | 커밋(등록 시점): bc61c0a
+- 상태: 완료 | 판정: 완료 기준 충족
+- 시작: 2026-11-07 14:08 (추정 소요 3.6~4.5시간, 2회 분할 진행 — 사용자 승인) | 종료: 2026-11-07 | 커밋(등록 시점): bc61c0a
 - 실행 명령: `OMP_NUM_THREADS=1 uv run python v2/serving/bench.py --path {old,new} --out results/bench_{before,after}.json`, `pytest v2/serving/tests` | 출력 폴더: `v2/serving/results/`
 - 배경: EXP-011~013으로 서빙 경로(API·배치·Airflow)가 갖춰졌으나, `valuation_core.predict_valuation`이 요청·행마다 `add_knn_ppm2`로 cKDTree를 새로 만든다(`v2/serving/valuation_core.py:52`, 기준 데이터 n_ref=45,634행). 배치 7,561건·반복 API 호출에서 병목으로 의심된다.
 - 목적: 서빙 경로의 k-NN 병목(요청·행마다 cKDTree 재생성)을 없애고, 결과가 완전히 같다는 것을 확인한 뒤 전후 성능을 숫자로 기록한다.
@@ -800,15 +800,36 @@
   | pytest(`v2/serving/tests`) | - | 12 passed, 1 skipped(기존과 동일 사유로 skip) | - |
 
   - 지표 설명: 시세·knn_ppm2_5·same_bldg 차이는 두 parquet(로컬 전용, 커밋 안 함)을 deal_id 기준으로 행별 직접 비교. API(정정)는 `git worktree add /tmp/npl-el-old 87810cf`로 꺼낸 옛 코드와 지금 코드 각각에 대해 TestClient 1,000회(워밍업 50회 제외) p50·p95·평균(같은 artifact, MODEL_DIR로 지정, OMP_NUM_THREADS=1). 배치는 테스트 7,561건 "시세 추정" 단계(cKDTree 병목 지점)만 측정, 회수액 계산은 제외(두 경로 동일). 측정 조건: AMD Ryzen 9 5950X(32스레드)/125.7GB, Python 3.12.3, LightGBM 4.7.0, SciPy 1.18.1, OMP_NUM_THREADS=1(아래 "주의"에 실제 적용 확인).
-  - 결과 파일: `v2/serving/results/bench_before.json`, `v2/serving/results/bench_after.json`, `v2/serving/results/bench_before_api_fixed.json`(정정), `v2/serving/results/exp014_perf.md`
+  - 결과 파일: `v2/serving/results/bench_before.json`, `v2/serving/results/bench_after.json`, `v2/serving/results/bench_before_api_fixed.json`(정정, 기존 경로 실측), `v2/serving/results/bench_after_api_fixed.json`(정정, 새 경로를 기존 경로와 같은 세션에서 재측정), `v2/serving/results/exp014_perf.md`
 - 주의:
   - **bench.py 버그(발견·수정)**: `bench_api()`가 `--path` 인자와 무관하게 항상 "지금" `app.py`(이미 새 경로로 교체된 상태)만 측정했다. 그래서 `bench_before.json`·`bench_after.json`의 `api` 항목은 둘 다 새 경로를 잰 값이었다(배치 쪽(`bench_valuation_batch`)은 old/new 함수를 직접 호출해 구분했으므로 버그 없음, 영향 없음). `bench_api(app_dir=...)`로 다른 폴더의 app.py를 잴 수 있게 고치고(`v2/serving/bench.py`), `git worktree add /tmp/npl-el-old 87810cf`(EXP-014 코드 변경 전 커밋)로 옛 코드를 꺼내 실측했다. 정정값: 기존 30.337ms → 새 5.697ms(p50). 위 표의 잘못된 숫자는 취소선으로 남기고 지우지 않았다.
   - 구간별 분해(API 1건, p50, ms, 고정 주소 기준): a.검증·생성 0.24(공통) / b.k-NN old 9.17→new 0.30 / c.same_bldg old 14.12→new 1.15 / d.LightGBM예측 0.85(공통). old 함수 합(a+b+c+d)=24.38ms, 옛 코드 worktree로 재측정한 합=23.64ms(차이 3% 이내, 20% 기준 통과) — 배치 1건당 실측(25.1ms, FastAPI 없음)과 같은 수준. new 함수 합=2.54ms, 여기에 FastAPI/pydantic 잔차(TestClient 전체−함수합)≈3.5ms를 더하면 API 전체(≈6.0ms)와 맞는다. 다양 주소(테스트셋 샘플)로 재도 같은 패턴(차이 <0.2ms) — 주소 차이는 배치·API 격차의 원인이 아니었다.
   - **스레드 확인**: `OMP_NUM_THREADS` 1/4/32로 대형 predict(45,634행) 시간이 5452/1440/313ms로 거의 선형으로 변해 LightGBM이 이 환경변수를 실제로 읽어 썼음을 확인했다(명시적 `num_threads` 파라미터는 쓰지 않음). bench.py의 측정은 모두 `OMP_NUM_THREADS=1`로 실행해 LightGBM도 1스레드로 돌았다.
   - model_loader.py는 함수 변경 없이 `fast_features.KnnIndex`를 재노출(re-export)만 한다(app.py·batch_score.py가 한 곳에서 가져오게 함) — 9단계 지시 범위 안의 설계 선택.
-- 판정과 이유: (13~17단계 완료 후 기록)
-- 변경 이력: (13~17단계 완료 후 기록 — 이번 라운드 변경은 모두 지시 범위 안)
-- 다음: 13단계(MLflow 새 버전 등록, champion 이동)부터 이어서 진행(사용자 승인 대기).
+  - **Dockerfile 누락(발견·수정)**: 13단계 뒤 `docker compose up -d --build api`에서 `api` 컨테이너가 `ModuleNotFoundError: No module named 'fast_features'`로 즉시 종료됐다. `v2/serving/Dockerfile`의 `COPY` 목록(개별 파일 나열 방식)이 6단계에서 새로 만든 `fast_features.py`를 포함하지 않아 생긴 패키징 누락이었다. `COPY` 목록에 `v2/serving/fast_features.py`를 추가해 고치고 재빌드하니 정상 기동했다(`/health`·`/recovery`·`/valuation` 모두 200).
+- 결과(13~17단계):
+
+  | 확인 항목 | 결과 | 파일 |
+  |---|---|---|
+  | MLflow v4(재학습 없음, `train_register.py --skip-build`) 재예측 MdAPE | 11.563502%(기준 11.5635%, 차이 0.000002%p, 허용 0.0001%p) | MLflow run_id `99faf9cac27d4527bcdec9e55dfe1400` |
+  | champion 별칭 이동 | v3 → v4(v1·v2·v3 유지, 삭제 없음) | `http://localhost:5000` 레지스트리 |
+  | mlflow 컨테이너 재생성(`docker compose up -d --build`) 후 레지스트리 상태 | champion=v4 그대로 유지(`./mlflow_data` 볼륨 영속) | - |
+  | docker compose up -d --build(mlflow+api+airflow) → /health | `model_registry_version":"4"`, `model_alias":"champion"` | curl 응답 |
+  | /recovery(효창동 예시: market_price=48974, rho=0.644620, deposit=14700, ead=34281.8, months=24) | LGD=58.601003%(기준 58.6%, ±0.1%p) | curl 응답 |
+  | /valuation(신영동 예시) | 200, market_price=24629.80 | curl 응답 |
+  | DAG 1회 수동 실행(`manual__2026-11-07T13:03:32`) 작업 4개 | check_input·score·validate_output·log_to_mlflow 전부 success | `v2/serving/airflow/db/airflow.db` |
+  | DAG 출력(`rescore_2026-11-07.csv`) vs EXP-014 변경 전(=EXP-013에서 성공한 직전 실행) 출력 | diff 없음(바이트 동일) | `v2/serving/airflow/output/rescore_2026-11-07.csv` |
+  | pytest(`v2/serving/tests`) | 12 passed, 1 skipped(기존과 동일 사유) | - |
+
+  - 지표 설명: MdAPE는 `models:/npl-el-price/4`를 직접 불러와 테스트 7,561건으로 재계산(meta.json 캐시값을 쓰지 않음). DAG 출력 비교는 `diff` 명령으로 두 CSV 파일을 바이트 단위 비교.
+- 판정과 이유: 완료 기준 충족. 채택 기준 1~4(동일성 0건 불일치, MdAPE 11.5635%±0.0001%p, API p50 감소) 모두 정정값 기준으로 통과했고, 13단계(재학습 없이 새 버전 등록 → MdAPE 재확인 → champion 이동, 이전 버전 보존), 14단계(docker API 3개 정상 응답 + DAG 4개 작업 success + 출력 재현 차이 0)까지 전부 완료 기준을 만족했다. 중간에 발견한 bench.py 측정 버그와 Dockerfile 패키징 누락은 둘 다 멈춤 규칙대로 원인 특정 후 사용자 승인을 받고서만 고쳤다.
+- 변경 이력(지시 범위를 다소 넘는 변경, 모두 사용자 승인):
+  - `v2/serving/bench.py`: `bench_api()`가 `app_dir` 인자를 받게, `--api-only`/`--app-dir` CLI 옵션을 추가(5·11단계 지시에는 없던 범위, bench.py 자체 버그를 고치기 위해 4번째 대화 라운드에서 사용자가 직접 지시).
+  - `v2/serving/train_register.py`: `--skip-build` 플래그, `verify_mdape()` 함수 추가(13단계 "재학습 없이 등록 후 MdAPE 재확인" 요구를 구현하기 위한 범위 안 변경이지만 파일 자체는 EXP-012 때 만든 기존 파일이라 변경 이력에 남김).
+  - `v2/serving/Dockerfile`: `COPY` 목록에 `fast_features.py` 추가(14단계 중 발견한 패키징 누락 수정, 사용자 승인 후 반영).
+  - `v2/serving/results/bench_after_api_fixed.json`: 정정 라운드에서 새 경로를 기존 경로와 같은 세션·조건으로 재측정한 결과를 별도 파일로 저장(기존 `bench_after.json`의 `api` 값과 소폭 다름 — 둘 다 새 경로를 잰 값이라 같은 수준이지만, 정정 기록(5.697ms)의 출처를 파일로 남기기 위해 추가, 기존 `bench_after.json`은 덮어쓰지 않음).
+  - `v2/serving/README.md`: "성능" 절 추가, "알아둘 점"의 EXP-011/012 시절 "pyfunc_model이 느리다" 서술을 EXP-014로 해결됨으로 갱신, "재현·검증 결과" 표에 EXP-014 행 5개 추가.
+- 다음: Dockerfile의 개별 파일 COPY 방식을 폴더 복사 + `.dockerignore` 방식으로 바꾸는 안을 검토한다(이번 실험에서는 구현하지 않음, 이번에 겪은 "새 파일 추가 시 COPY 목록 누락" 재발을 막기 위한 제안).
 
 ---
 

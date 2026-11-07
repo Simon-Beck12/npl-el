@@ -1,0 +1,21 @@
+/home/beck/바탕화면/npl-el-pipeline/.venv/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+  from starlette.testclient import TestClient as TestClient  # noqa
+좌표 없는 행: 0 / 69,371 (0.00%)
+
+=== fixed address ===
+
+=== varying address(test set 샘플) ===
+
+--- stage p50(ms) ---
+fixed: {'a_validate_build': 0.23967650486156344, 'b_knn_old': 9.067356499144807, 'b_knn_new': 0.30809550662525, 'c_same_bldg_old': 13.872179508325644, 'c_same_bldg_new': 1.1394104949431494, 'd_predict': 0.8492139968439005}
+varying: {'a_validate_build': 0.2390100053162314, 'b_knn_old': 9.035495997522958, 'b_knn_new': 0.3042075040866621, 'c_same_bldg_old': 13.660480995895341, 'c_same_bldg_new': 1.1542339925654233, 'd_predict': 0.8746974999667145}
+
+--- TestClient 전체(현재 app.py=새 경로) p50(ms) ---
+fixed: 6.370286995661445
+varying: 6.5092885051853955
+
+--- 함수 합(FastAPI 제외) ---
+old(a+b+c+d) fixed=24.028ms varying=23.810ms
+new(a+b+c+d) fixed=2.536ms varying=2.572ms
+e(잔차=TestClient 전체-new 함수합) fixed=3.834ms varying=3.937ms
+old 추정 TestClient 전체 = old(a+b+c+d) + e  fixed=27.862ms varying=27.747ms
