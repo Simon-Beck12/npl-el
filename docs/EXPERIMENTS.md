@@ -34,7 +34,7 @@
 | EXP-010 | 일괄매각 의심 면적 필터 + v1·v2 LGD 재계산 | 완료 | 완료 기준 충족 | 2026-11-05 18:00 | v1 57.4%→79.0%(19건), v2 87.5%→87.5%(18건, 변화 없음) | 25ff949 |
 | EXP-011 | v2 서빙 1단계 (FastAPI + Docker Compose) | 완료 | 완료 기준 충족 | 2026-11-06 | docker API 3개 응답, /recovery LGD 58.6010%(기대 58.6%) | 154221c |
 | EXP-012 | v2 서빙 2단계 (MLflow 추적·레지스트리) | 완료 | 완료 기준 충족 | 2026-11-06 | 재현 A 차이 0.00%p, 재현 B 차이 0, docker API npl-el-price v3 champion 응답 | 4be6ed2 |
-| EXP-013 | v2 서빙 3단계 (Airflow 일일 배치 재채점) | 완료 | 완료 기준 충족 | 2026-11-07 | DAG 4개 작업 success, 시세 재현 차이 0, MLflow npl-el-batch run(portfolio_lgd=0.578428) | (다음 커밋에서 기록) |
+| EXP-013 | v2 서빙 3단계 (Airflow 일일 배치 재채점) | 완료 | 완료 기준 충족 | 2026-11-07 | DAG 4개 작업 success, 시세 재현 차이 0, MLflow npl-el-batch run(portfolio_lgd=0.578428) | 38c0afa |
 
 ---
 
@@ -670,7 +670,7 @@
 
 ## EXP-013 | v2 서빙 3단계 (Airflow 일일 배치 재채점)
 - 상태: 완료 | 판정: 완료 기준 충족
-- 시작: 2026-11-07 (추정 소요 1~2시간) | 종료: 2026-11-07 | 커밋(등록 시점): (다음 커밋에서 기록)
+- 시작: 2026-11-07 (추정 소요 1~2시간) | 종료: 2026-11-07 | 커밋(등록 시점): 38c0afa
 - 실행 명령: `docker compose up`(mlflow+api+airflow), DAG `npl_el_daily_rescore` | 출력 폴더: `v2/serving/airflow/`
 - 배경: EXP-012(MLflow 레지스트리, champion 별칭)의 champion 모델을 매일 자동으로 배치 채점하고 실행 기록을 남긴다.
 - 목적: Airflow DAG로 champion 모델의 배치 채점을 매일 자동 실행하고, 실행 기록을 MLflow에 남긴다. 함께 `/valuation` 주소 입력을 필수로 바꾼다.
