@@ -1,0 +1,22 @@
+{
+  "mode": "api_only",
+  "app_dir": "/tmp/npl-el-old/v2/serving",
+  "api": {
+    "p50_ms": 30.336576997797238,
+    "p95_ms": 33.09553154867899,
+    "mean_ms": 30.471880044962745
+  },
+  "conditions": {
+    "cpu_model": "AMD Ryzen 9 5950X 16-Core Processor",
+    "cpu_count_logical": 32,
+    "mem_total_gb": 125.7,
+    "python_version": "3.12.3",
+    "lightgbm_version": "4.7.0",
+    "scipy_version": "1.18.1",
+    "lightgbm_num_threads_env": "1",
+    "api_warmup": 50,
+    "api_n_calls": 1000,
+    "batch_n_rows": null,
+    "path": "api_only(app_dir=/tmp/npl-el-old/v2/serving)"
+  }
+}

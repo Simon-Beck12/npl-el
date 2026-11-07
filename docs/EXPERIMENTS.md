@@ -788,19 +788,23 @@
   | 1. 시세 차이 ≤1e-6만원(7,561건) | 최대 차이 0.0 | 통과 |
   | 2. knn_ppm2_5·same_bldg 전행 일치 | 불일치 0건 | 통과 |
   | 3. 새 경로 테스트 MdAPE 11.5635%(±0.0001%p) | 11.56350202467546% (구 경로와 동일값) | 통과 |
-  | 4. API 단건 p50 감소 | 5.923ms → 5.719ms(−3.4%) | 통과 |
+  | ~~4. API 단건 p50 감소~~ | ~~5.923ms → 5.719ms(−3.4%)~~ | ~~통과~~ (2026-11-07 취소 — 아래 "주의" 버그로 두 숫자 모두 새 경로를 잰 값이었음) |
+  | 4. API 단건 p50 감소(정정, 실측) | 30.337ms → 5.697ms(−81.2%, 5.32배) | 통과 |
 
   | 측정 항목 | 기존 경로(bench_before.json) | 새 경로(bench_after.json) | 배수 |
   |---|---|---|---|
-  | API p50 / p95 / 평균 | 5.923 / 6.942 / 6.024 ms | 5.719 / 6.443 / 5.751 ms | 1.04x |
+  | ~~API p50 / p95 / 평균~~ | ~~5.923 / 6.942 / 6.024 ms~~ | ~~5.719 / 6.443 / 5.751 ms~~ | ~~1.04x~~ (2026-11-07 취소, 아래 참고) |
+  | API p50 / p95 / 평균(정정, 실측) | 30.337 / 33.096 / 30.472 ms | 5.697 / 6.232 / 5.710 ms | 5.32x(p50) |
   | 배치 시세 추정(7,561건) | 190.121초(39.8행/초) | 0.773초(9,782.9행/초) | 246.0x |
   | 모델 로드 직후 RSS | 244.60 MB | 244.46 MB | - |
   | pytest(`v2/serving/tests`) | - | 12 passed, 1 skipped(기존과 동일 사유로 skip) | - |
 
-  - 지표 설명: 시세·knn_ppm2_5·same_bldg 차이는 두 parquet(로컬 전용, 커밋 안 함)을 deal_id 기준으로 행별 직접 비교. API는 TestClient 1,000회(워밍업 50회 제외) p50·p95·평균. 배치는 테스트 7,561건 "시세 추정" 단계(cKDTree 병목 지점)만 측정, 회수액 계산은 제외(두 경로 동일). 측정 조건: AMD Ryzen 9 5950X(32스레드)/125.7GB, Python 3.12.3, LightGBM 4.7.0, SciPy 1.18.1, OMP_NUM_THREADS=1.
-  - 결과 파일: `v2/serving/results/bench_before.json`, `v2/serving/results/bench_after.json`
+  - 지표 설명: 시세·knn_ppm2_5·same_bldg 차이는 두 parquet(로컬 전용, 커밋 안 함)을 deal_id 기준으로 행별 직접 비교. API(정정)는 `git worktree add /tmp/npl-el-old 87810cf`로 꺼낸 옛 코드와 지금 코드 각각에 대해 TestClient 1,000회(워밍업 50회 제외) p50·p95·평균(같은 artifact, MODEL_DIR로 지정, OMP_NUM_THREADS=1). 배치는 테스트 7,561건 "시세 추정" 단계(cKDTree 병목 지점)만 측정, 회수액 계산은 제외(두 경로 동일). 측정 조건: AMD Ryzen 9 5950X(32스레드)/125.7GB, Python 3.12.3, LightGBM 4.7.0, SciPy 1.18.1, OMP_NUM_THREADS=1(아래 "주의"에 실제 적용 확인).
+  - 결과 파일: `v2/serving/results/bench_before.json`, `v2/serving/results/bench_after.json`, `v2/serving/results/bench_before_api_fixed.json`(정정), `v2/serving/results/exp014_perf.md`
 - 주의:
-  - API p50 개선은 배치 대비 작다(1.04배) — 단건 호출은 원래도 cKDTree 1회 생성 비용(ref 45,634행 기준 수 ms)이 전체 응답 시간에서 차지하는 비중이 작았기 때문으로 추정(LightGBM 2554트리 predict 등 다른 고정 비용이 더 큼). 채택 기준 4(p50 감소)는 통과했다.
+  - **bench.py 버그(발견·수정)**: `bench_api()`가 `--path` 인자와 무관하게 항상 "지금" `app.py`(이미 새 경로로 교체된 상태)만 측정했다. 그래서 `bench_before.json`·`bench_after.json`의 `api` 항목은 둘 다 새 경로를 잰 값이었다(배치 쪽(`bench_valuation_batch`)은 old/new 함수를 직접 호출해 구분했으므로 버그 없음, 영향 없음). `bench_api(app_dir=...)`로 다른 폴더의 app.py를 잴 수 있게 고치고(`v2/serving/bench.py`), `git worktree add /tmp/npl-el-old 87810cf`(EXP-014 코드 변경 전 커밋)로 옛 코드를 꺼내 실측했다. 정정값: 기존 30.337ms → 새 5.697ms(p50). 위 표의 잘못된 숫자는 취소선으로 남기고 지우지 않았다.
+  - 구간별 분해(API 1건, p50, ms, 고정 주소 기준): a.검증·생성 0.24(공통) / b.k-NN old 9.17→new 0.30 / c.same_bldg old 14.12→new 1.15 / d.LightGBM예측 0.85(공통). old 함수 합(a+b+c+d)=24.38ms, 옛 코드 worktree로 재측정한 합=23.64ms(차이 3% 이내, 20% 기준 통과) — 배치 1건당 실측(25.1ms, FastAPI 없음)과 같은 수준. new 함수 합=2.54ms, 여기에 FastAPI/pydantic 잔차(TestClient 전체−함수합)≈3.5ms를 더하면 API 전체(≈6.0ms)와 맞는다. 다양 주소(테스트셋 샘플)로 재도 같은 패턴(차이 <0.2ms) — 주소 차이는 배치·API 격차의 원인이 아니었다.
+  - **스레드 확인**: `OMP_NUM_THREADS` 1/4/32로 대형 predict(45,634행) 시간이 5452/1440/313ms로 거의 선형으로 변해 LightGBM이 이 환경변수를 실제로 읽어 썼음을 확인했다(명시적 `num_threads` 파라미터는 쓰지 않음). bench.py의 측정은 모두 `OMP_NUM_THREADS=1`로 실행해 LightGBM도 1스레드로 돌았다.
   - model_loader.py는 함수 변경 없이 `fast_features.KnnIndex`를 재노출(re-export)만 한다(app.py·batch_score.py가 한 곳에서 가져오게 함) — 9단계 지시 범위 안의 설계 선택.
 - 판정과 이유: (13~17단계 완료 후 기록)
 - 변경 이력: (13~17단계 완료 후 기록 — 이번 라운드 변경은 모두 지시 범위 안)

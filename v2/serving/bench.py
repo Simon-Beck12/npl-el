@@ -84,7 +84,17 @@ def load_test_set():
     return test.reset_index(drop=True)
 
 
-def bench_api():
+def bench_api(app_dir=None):
+    """EXP-014: app_dir이 없으면 지금 이 폴더(v2/serving)의 app.py를 잰다(현재 코드 = 새 경로).
+    app_dir을 주면 그 폴더의 app.py를 잰다(다른 커밋을 `git worktree add`로 꺼낸 폴더를 가리키면
+    기존(이전) 경로를 그대로 잴 수 있다 — 기존 버그: 이 함수가 app_dir 없이 항상 "지금" app.py만
+    측정해서 --path old로 실행해도 실제로는 새 경로를 두 번 잰 꼴이었다)."""
+    if app_dir:
+        app_dir = Path(app_dir).resolve()
+        repo_root = app_dir.parent.parent
+        sys.path.insert(0, str(app_dir))
+        sys.path.insert(0, str(repo_root / "v2"))
+        sys.path.insert(0, str(repo_root / "src"))
     import app as app_module
     from fastapi.testclient import TestClient
 
@@ -148,11 +158,29 @@ def test_mdape(test, market_price):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--path", choices=["old", "new"], required=True)
+    parser.add_argument("--path", choices=["old", "new"])
     parser.add_argument("--out", required=True)
     parser.add_argument("--compare-parquet", default=None,
                          help="행별 deal_id·시세·knn_ppm2_5·same_bldg 저장 경로(로컬 전용, 커밋 안 함)")
+    parser.add_argument("--app-dir", default=None,
+                         help="EXP-014 버그 수정: 이 폴더의 app.py로 API만 잰다(다른 커밋을 "
+                              "`git worktree add`로 꺼낸 폴더의 v2/serving을 가리킨다). --api-only와 함께 쓴다.")
+    parser.add_argument("--api-only", action="store_true",
+                         help="API 단건 응답 시간만 재고 끝낸다(배치·MdAPE·메모리·비교parquet는 생략).")
     args = parser.parse_args()
+
+    if args.api_only:
+        api = bench_api(app_dir=args.app_dir)
+        result = {"mode": "api_only", "app_dir": args.app_dir, "api": api,
+                  "conditions": measurement_conditions(f"api_only(app_dir={args.app_dir})", None)}
+        out_path = Path(args.out)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return
+
+    if not args.path:
+        parser.error("--path는 --api-only가 아니면 필수다")
 
     mem_after_import = _rss_mb()
 
