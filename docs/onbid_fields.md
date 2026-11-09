@@ -19,7 +19,7 @@
 | cltrUsgLclsCtgrNm | "부동산" | 용도 대분류명 |
 | cltrUsgMclsCtgrNm | "주거용건물" | 용도 중분류명 |
 | cltrUsgSclsCtgrNm | "도시형생활주택" | 용도 소분류명 |
-| onbidCltrNm | "서울시 중구 신당동 251-73 1001호 도시형생활주택" | 물건명(주소 포함, 파싱 대상) |
+| onbidCltrNm | "서울시 중구 신당동 251-** (호수 생략) 도시형생활주택" | 물건명(주소 포함, 파싱 대상) |
 | landSqms | 0 | 토지면적(㎡) |
 | bldSqms | 14.54 | 건물면적(㎡) |
 | pbctNsq | "3" | 공매 회차 |
